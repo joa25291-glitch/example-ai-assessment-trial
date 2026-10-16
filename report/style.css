@@ -1,0 +1,68 @@
+@page { size: A4; margin: 15mm 16mm 17mm 16mm; }
+:root { --ink: #1d1d1f; --muted: #5b6270; --rule: #c9ced6; --accent: #1f5fbf; --band: #eef3fb; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: "Carlito", "Liberation Sans", sans-serif; font-size: 10.6pt; line-height: 1.38; color: var(--ink);
+       background: #fff; margin: 0; max-width: none; padding: 0; }
+p { margin: 0.45em 0; text-align: justify; hyphens: auto; }
+h1 { font-size: 17pt; color: var(--accent); border-bottom: 1.5px solid var(--accent); padding-bottom: 2mm;
+     margin: 0 0 4mm 0; break-before: page; font-weight: 700; }
+h2 { font-size: 12.5pt; color: var(--ink); margin: 6mm 0 2mm 0; break-after: avoid; }
+h3 { font-size: 11pt; margin: 4mm 0 1.5mm 0; break-after: avoid; }
+ul, ol { margin: 0.4em 0 0.4em 1.2em; padding-left: 0.6em; }
+li { margin: 0.18em 0; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.8pt; background: #f3f4f6; padding: 0 2px; border-radius: 2px; }
+strong { font-weight: 700; }
+
+/* tables */
+table { border-collapse: collapse; margin: 3mm auto 4mm auto; font-size: 9pt; break-inside: auto; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+th, td { border: 0.6px solid var(--rule); padding: 1.2mm 2mm; vertical-align: middle; }
+th { background: var(--band); font-weight: 700; text-align: left; }
+caption { caption-side: bottom; font-size: 8.6pt; color: var(--muted); padding-top: 1.5mm; text-align: left; font-style: italic; }
+.small table { font-size: 7.6pt; }
+.small th, .small td { padding: 0.8mm 1.2mm; }
+.matrix table { font-size: 6.0pt; }
+.matrix th, .matrix td { padding: 0.5mm 0.7mm; text-align: right; white-space: nowrap; }
+
+/* figures */
+figure { margin: 4mm 0 5mm 0; text-align: center; break-inside: avoid; }
+figure img { max-width: 178mm; height: auto; }
+figcaption { font-size: 8.8pt; color: var(--muted); font-style: italic; margin-top: 1.5mm; text-align: center; }
+
+/* maths */
+.katex { font-size: 1.04em; }
+.katex-display { margin: 0.55em 0; break-inside: avoid; }
+span.math.display { display: block; }
+
+/* cover */
+.cover { height: 262mm; display: block; break-after: page; overflow: hidden; }
+.cover-band { background: var(--accent); color: #fff; padding: 4mm 6mm; font-size: 11pt; letter-spacing: 0.06em;
+              text-transform: uppercase; font-weight: 700; }
+.cover-title { border: none; color: var(--ink); font-size: 24pt; line-height: 1.15; margin: 14mm 0 3mm 0; break-before: avoid; }
+.cover-sub { font-size: 13pt; color: var(--muted); margin: 0 0 8mm 0; }
+.cover-fig { display: block; width: 178mm; height: 100mm; border: 0.6px solid var(--rule); box-sizing: border-box; }
+.cover-meta { margin: 10mm 0 0 0; font-size: 10pt; width: 100%; }
+.cover-meta td:first-child { width: 32mm; font-weight: 700; background: var(--band); }
+
+/* table of contents */
+.toc { break-after: page; }
+.toc-title { font-size: 17pt; color: var(--accent); border-bottom: 1.5px solid var(--accent); padding-bottom: 2mm; margin-top: 0; }
+.toc ol { list-style: none; margin: 0; padding: 0; }
+.toc li { display: flex; align-items: baseline; margin: 1.6mm 0; font-size: 11pt; }
+.toc li.lvl2 { padding-left: 7mm; font-size: 10pt; margin: 0.8mm 0; color: #333; }
+.toc li .t { flex: 0 0 auto; }
+.toc li .dots { flex: 1 1 auto; border-bottom: 1px dotted #9aa1ad; margin: 0 2mm; transform: translateY(-1mm); }
+.toc li .pg { flex: 0 0 auto; min-width: 7mm; text-align: right; }
+.toc a { color: inherit; text-decoration: none; }
+
+/* KaTeX's hidden MathML copy is not needed in print and can widen the layout */
+.katex .katex-mathml { display: none; }
+/* inline maths at a line end can poke <1 mm past the margin; clip it so Chromium never shrinks pages to fit */
+html, body { overflow-x: clip; }
+
+/* in-person guide */
+.guide-head { margin-bottom: 4mm; }
+.guide-title { border: none; color: var(--ink); font-size: 19pt; line-height: 1.15; margin: 6mm 0 2mm 0; break-before: avoid; }
+body:has(.guide-head) h2 { color: var(--accent); border-bottom: 1px solid var(--rule); padding-bottom: 1mm; margin-top: 4.5mm; }
+body:has(.guide-head) p, body:has(.guide-head) li { font-size: 10pt; }

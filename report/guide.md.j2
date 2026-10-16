@@ -1,0 +1,95 @@
+<% set d = a %>
+```{=html}
+<section class="guide-head">
+  <div class="cover-band">MIET1077 · in-person preparation</div>
+  <h1 class="guide-title">Six-bar linkage by hand: workflow, formulas and traps</h1>
+  <p class="cover-sub">A condensed companion to the worked solution. The numbers in brackets are the worked example (OA = <<n(p.OA*1000,0)>> mm, β = <<n(p.beta_deg,0)>>°, θ₁ = <<n(p.theta1_deg,0)>>°, n₂ = <<n(p.n2_rpm,0)>> rpm), so you can check your method step by step.</p>
+</section>
+```
+
+## 0. Kit and page set-up
+
+Ruler (mm), protractor, compass, two set squares, calculator in **degree** mode, and A4/A3 sheets. Work in mm on paper and in m in calculations. Write the scale on **every** drawing. Lay the space diagram out with O on the left, about 30 mm in from the edge and 30–40 mm above the bottom.
+
+## 1. Data selection (about 5 min)
+
+1. $\omega_2 = 2\pi n_2/60$ [<<n(p.omega2,4)>> rad/s].
+2. $OE = CD = 4\,OA$ [<<n(p.OE*1000,0)>> mm], $H = OA/4$ [<<n(p.H*1000,0)>> mm], then choose AB and BE, then $AC = \tfrac35 AB$ [<<n(p.AC*1000,0)>> mm].
+3. Check $OA+AB < OE+BE$ and $OA+OE < AB+BE$. With OA the shortest link, Grashof ($s+l \le p+q$) makes the crank rotate fully.
+4. A good starting choice is **AB ≈ 3.5–3.8·OA** and **BE ≈ 2·OA** (here <<n(p.AB/p.OA,2)>>·OA and <<n(p.BE/p.OA,2)>>·OA). It satisfies both inequalities with margin and keeps the transmission angle above ~50°.
+
+## 2. Position analysis (Section 1)
+
+- **One position (steps a–f):** OA at θ₂ → OE at θ₁ → arcs AB (centre A) and BE (centre E) meet at B (take the intersection *above* E, as in the handout figure) → AC at β *below* AB → horizontal line H below O → arc CD (centre C) meets it at D.
+- **16 positions:** θ₂ = 60°, 82.5°, 105°, … (+22.5° each, CCW). Number A₁…A₁₆ and repeat the numbers on B, C and D. Join successive points to get S_A (circle), S_B (arc), S_C (oval coupler curve) and S_D (straight line).
+- **Rocker limits B′, B″ (exact construction):** the rocker stops when OA and AB are in line. Draw circles centred at O with radii **AB + OA** (extended) and **AB − OA** (folded); where they cut the arc of B (radius BE about E) are B′ and B″. [θ₄ = <<n(rk_min.theta4,1)>>° at θ₂ = <<n(rk_min.theta2,1)>>°, and <<n(rk_max.theta4,1)>>° at θ₂ = <<n(rk_max.theta2,1)>>°.]
+- **Slider limits D_L, D_R:** where V_D = 0. Tabulate S against θ₂ from your 16 positions and interpolate around the largest and smallest S. [D_R = <<n(S_max*1000,1)>> mm at <<n(th_DR,1)>>°, D_L = <<n(S_min*1000,1)>> mm at <<n(th_DL,1)>>°, stroke <<n(stroke*1000,1)>> mm.]
+
+## 3. Velocity polygon (Section 2)
+
+- $V_A = \omega_2\cdot OA$ [<<n(mag(d.VA),3)>> m/s], ⊥OA, pointing the way the crank turns (at θ₂ + 90° for CCW).
+- Pick a scale that makes *oa* 100–160 mm long [1 m/s = 20 mm].
+- **Order:** b = (⊥AB through a) ∩ (⊥BE through o) → c = (⊥AC through a) ∩ (⊥BC through b) → d = (horizontal through o) ∩ (⊥CD through c) → g₃ = (⊥AG₃ through a) ∩ (⊥BG₃ through b). g₂, g₄, g₅ are the mid-points of oa, ob, cd.
+- **Angular velocity and sense:** $\omega = V_{rel}/r$. Rotate the link vector (e.g. A→B) by 90° anticlockwise; if the relative velocity (e.g. V_B/A) points that way the link turns CCW, otherwise CW. [ω₃ = <<n(abs(d.omega3),2)>> CW, ω₄ = <<n(abs(d.omega4),2)>> CCW, ω₅ = <<n(abs(d.omega5),2)>> CW rad/s]
+
+## 4. Acceleration polygon (Section 3)
+
+1. **Tabulate every normal component first:** $a^n = V_{rel}^2/r$, directed **towards** the centre of the relative rotation.
+   - Ground-pivoted links use the absolute velocity: $a^n_A = \omega_2^2\,OA$ [<<n(mag(d.aA),1)>> m/s²], $a^n_B = V_B^2/BE$.
+   - Floating links use the **relative** velocity: $a^n_{B/A} = V_{B/A}^2/AB$, not $V_B^2/AB$.
+2. α₂ = 0 ⇒ $a^t_A = 0$, so $a_A$ is along A→O.
+3. Scale so that o′a′ ≈ 150 mm [1 mm = 2.5 m/s²]. Draw each normal component from the right point, then the ⊥ line through its tip; intersections give b′, c′, d′ and g₃′.
+4. $\alpha = a^t/r$, with the sense from the direction of $a^t$ (same rule as for ω). [α₃ = <<n(d.alpha3,0)>>, α₄ = <<n(d.alpha4,0)>>, α₅ = <<n(d.alpha5,0)>> rad/s², all CCW]
+5. A component shorter than 1 mm (here $a^n_{D/C}$ = <<n(mag(d.VDC)**2/p.CD,2)>> m/s²) can be omitted from the drawing, but state its value.
+
+## 5. Instantaneous centres (Section 4)
+
+$C = n(n-1)/2 = 15$. **Known (7):** I₁₂ = O, I₂₃ = A, I₃₄ = B, I₁₄ = E, I₃₅ = C, I₅₆ = D, and I₁₆ at ∞ (vertical).
+
+| Step | IC | Line 1 | Line 2 |
+|---|---|---|---|
+| 1 | I₁₃ | O–A (I₁₂I₂₃) | E–B (I₁₄I₃₄) |
+| 2 | I₂₄ | O–E (I₁₂I₁₄) | A–B (I₂₃I₃₄) |
+| 3 | I₁₅ | I₁₃–C (I₁₃I₃₅) | vertical through D (I₁₆I₅₆) |
+| 4 | I₃₆ | C–D (I₃₅I₅₆) | vertical through I₁₃ (I₁₃I₁₆) |
+| 5 | I₂₅ | A–C (I₂₃I₃₅) | O–I₁₅ (I₁₂I₁₅) |
+| 6 | I₄₅ | B–C (I₃₄I₃₅) | E–I₁₅ (I₁₄I₁₅) |
+| 7 | I₂₆ | vertical through O (I₁₂I₁₆) | A–I₃₆ (I₂₃I₃₆) |
+| 8 | I₄₆ | vertical through E (I₁₄I₁₆) | B–I₃₆ (I₃₄I₃₆) |
+
+**Velocities:** $V_A = \omega_2 r_{12A}$; $\omega_3 = V_A/r_{13A}$; $V_B = \omega_3 r_{13B}$; $V_C = \omega_3 r_{13C}$; and $V_D = \omega_2\cdot\overline{O\,I_{26}}$. The I₂₆ route is the easy one, because I₁₅ usually lies off the page [about 5 m away here]. Measure short radii carefully: a 0.5 mm error on a 15 mm radius is already 3 %.
+
+## 6. Analytical method (Section 5): formulas to know
+
+$$\text{Re} = l_1\cos\theta_1 - l_2\cos\theta_2,\quad \text{Im} = l_1\sin\theta_1 - l_2\sin\theta_2,\quad C = \frac{\text{Re}^2+\text{Im}^2+l_4^2-l_3^2}{2l_4}$$
+$$t = \frac{-\text{Im}\pm\sqrt{\text{Re}^2+\text{Im}^2-C^2}}{C-\text{Re}},\qquad \theta_4 = 2\tan^{-1}t\ \ (\text{take }0<\theta_4<180^\circ),$$
+$$\theta_3 = 2\tan^{-1}\frac{\text{Im}+l_4\sin\theta_4}{l_3+\text{Re}+l_4\cos\theta_4}$$
+$$\theta_5 = \sin^{-1}\frac{-H-y_C}{l_5},\qquad S = x_C + l_5\cos\theta_5,\qquad y_C = l_2\sin\theta_2 + AC\sin(\theta_3-\beta)$$
+$$\omega_3 = \frac{l_2\omega_2\sin(\theta_4-\theta_2)}{l_3\sin(\theta_3-\theta_4)},\qquad \omega_4 = \frac{l_2\omega_2\sin(\theta_2-\theta_3)}{l_4\sin(\theta_4-\theta_3)},$$
+$$\omega_5 = \frac{-V_{Cy}}{l_5\cos\theta_5},\qquad V_D = V_{Cx} - l_5\omega_5\sin\theta_5$$
+$$\alpha_3 = \frac{CD-AF}{AE-BD},\qquad \alpha_4 = \frac{CE-BF}{AE-BD}\ \ (\text{constants A–F of Week 7}),$$
+$$\alpha_5 = \frac{l_5\omega_5^2\sin\theta_5 - a_{Cy}}{l_5\cos\theta_5},\qquad a_D = a_{Cx} - l_5\alpha_5\sin\theta_5 - l_5\omega_5^2\cos\theta_5$$
+
+**Always check:** substitute θ₃ and θ₄ back and confirm |B − A| = AB. This one-line check catches the sign slips in the lecture example (report Appendix A). Use ± signs on ω and α (+ = CCW).
+
+## 7. Dynamic forces (Section 6)
+
+- 14 unknowns: $F_{12x}, F_{12y}, F_{32x}, F_{32y}, F_{43x}, F_{43y}, F_{53x}, F_{53y}, F_{14x}, F_{14y}, F_{65x}, F_{65y}, F_{16y}, T_{12}$.
+- Per link: $\sum F_x = m a_{Gx}$, $\sum F_y = m a_{Gy}$, $\sum (R\times F) + T = I_G\alpha$, with $R\times F = R_xF_y - R_yF_x$, and **R measured from G to the joint**.
+- Replace $F_{23}$ by $-F_{32}$, $F_{34}$ by $-F_{43}$, $F_{35}$ by $-F_{53}$ and $F_{56}$ by $-F_{65}$ *before* building the matrix; that is where all the minus signs in [A] come from.
+- Slider: $F_{16x} = \mu' F_{16y}$, where $\mu' = -\mu\,\text{sign}(V_D)\,\text{sign}(F_{16y})$; solve once with μ′ = 0 to get the signs.
+- Check $T_{12}\,\omega_2 = \sum(m\,\mathbf a_G\cdot\mathbf V_G + I\alpha\omega)$ [T₁₂ = <<n(F0.T12,2)>> N·m].
+
+## 8. Shaking force and balancing (Section 8)
+
+$\mathbf F_s = \mathbf F_{21}+\mathbf F_{41}+\mathbf F_{61} = -\sum m_i\mathbf a_{Gi}$ and $M_s = T_{21} + \mathbf R_E\times\mathbf F_{41} + \mathbf R_D\times\mathbf F_{61}$ [<<n(s8.at60.Fs,0)>> N, <<n(s8.at60.Ms,1)>> N·m]. Strategy: (1) split link 5 into $m_5/2$ at C and $m_5/2$ at D; (2) give links 2 and 4 the Berkof–Lowen counterweights so that the centre of mass of links 2–4 stays still; (3) the remaining force $-(m_6+m_5/2)\,a_D$ is horizontal and reciprocating, so it can only be reduced (least squares, or an opposed slider); (4) add a flywheel, because the counterweights increase the torque fluctuation.
+
+## 9. Traps that cost marks
+
+1. Missing scale, units or arrowheads on polygons; unlabeled vectors (the rubric asks for "scale, labelling and directions").
+2. Using the absolute instead of the relative velocity in $a^n$, or drawing $a^n$ away from the centre.
+3. Mixing mm and m (ω × mm gives mm/s).
+4. Taking the wrong root for θ₄ (B below E), or using $+H$ for a slider below O.
+5. Measuring kinematics at a WM body's centre of mass instead of at a point placed on the joint, which gives ≈ 50 % low values (FAQ).
+6. Leaving gravity on in WM when comparing with the matrix method (here ≤ <<n(s7.summary.gravity_T12_maxdiff,1)>> N·m difference in T₁₂).
+7. Not stating the G₃ interpretation ("β/2 and AB/2": bisector, AB/2 from A).

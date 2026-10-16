@@ -1,0 +1,722 @@
+<% set d = a %>
+<% if target == "html" %>
+```{=html}
+<section class="cover">
+  <div class="cover-band">MIET1077 · Mechanics of Machines</div>
+  <h1 class="cover-title">Kinematic and Dynamic Analysis of a Six-Bar Linkage Mechanism</h1>
+  <p class="cover-sub">Major Assignment — fully worked practice solution</p>
+  <img class="cover-fig" src="figures/fig1_space_diagram.svg" alt="six-bar linkage at the analysis position">
+  <table class="cover-meta">
+    <tr><td>Prepared for</td><td>Learning / exam preparation (not for submission)</td></tr>
+    <tr><td>Student</td><td>________________________ &nbsp; Student no. ____________</td></tr>
+    <tr><td>Parameters</td><td>OA = <<n(p.OA*1000,0)>> mm, β = <<n(p.beta_deg,0)>>°, θ<sub>1</sub> = <<n(p.theta1_deg,0)>>°, n<sub>2</sub> = <<n(p.n2_rpm,0)>> rpm (example values — replace with the ones your lecturer gives you)</td></tr>
+    <tr><td>Methods</td><td>Graphical · Instantaneous centres · Analytical (complex-number vector loops) · Computational (multibody simulation) · Matrix force analysis · Balancing</td></tr>
+    <tr><td>Date</td><td>October 2026</td></tr>
+  </table>
+</section>
+<nav class="toc" id="toc">
+<h2 class="toc-title">Table of Contents</h2>
+<!--TOC-->
+</nav>
+```
+<% endif %>
+
+# Summary {#summary}
+
+This report analyses the six-bar linkage of the MIET1077 major assignment: a crank (link 2) drives a ternary coupler (link 3) that is held by a rocker (link 4); a connecting rod (link 5) taken from point C of the coupler drives a slider (link 6) on a horizontal guide. The crank length is OA = <<n(p.OA*1000,0)>> mm and it turns anticlockwise at a constant <<n(p.n2_rpm,0)>> rpm (ω₂ = <<n(p.omega2,3)>> rad/s). All other lengths follow from the course data-selection rules (OE = CD = 4·OA, AC = 3/5·AB, H = OA/4) with AB = <<n(p.AB*1000,0)>> mm and BE = <<n(p.BE*1000,0)>> mm chosen to give a Grashof crank–rocker with a good transmission angle (never below <<n(R.transmission.fourbar_min,1)>>°).
+
+**What the mechanism does.** The crank turns fully, the rocker swings through <<n(rk_swing,1)>>°, and the slider makes a <<n(stroke*1000,1)>> mm stroke between S = <<n(S_min*1000,1)>> mm and <<n(S_max*1000,1)>> mm from the crank pivot. The slider's rightward stroke takes <<n(ang_fwd,1)>>° of crank rotation and its return takes <<n(ang_ret,1)>>°, a quick-return time ratio of <<n(Q,2)>>.
+
+**Key results at the specified position (θ₂ = 60°).**
+
+| Quantity | Value |
+|---|---|
+| Slider velocity / acceleration | <<n(mag(d.VD),2)>> m/s ← and <<n(mag(d.aD),1)>> m/s² ← (both to the left) |
+| Angular velocities ω₃, ω₄, ω₅ | <<n(abs(d.omega3),2)>> (<<sense(d.omega3)>>), <<n(abs(d.omega4),2)>> (<<sense(d.omega4)>>), <<n(abs(d.omega5),2)>> (<<sense(d.omega5)>>) rad/s |
+| Angular accelerations α₃, α₄, α₅ | <<n(abs(d.alpha3),1)>>, <<n(abs(d.alpha4),1)>>, <<n(abs(d.alpha5),1)>> rad/s² (all <<sense(d.alpha3)>>) |
+| Driving torque on the crank T₁₂ | <<n(F0.T12,1)>> N·m |
+| Largest pin force (crank bearing O) | <<n(pins[0].m,0)>> N |
+| Slider side load on the guide | <<n(abs(F0.F16y),0)>> N |
+| Shaking force / shaking moment on the frame | <<n(s8.at60.Fs,0)>> N at <<n(s8.at60.Fs_angle,1)>>° / <<n(s8.at60.Ms,1)>> N·m |
+
+**Over one revolution** the driving torque swings between <<n(s7.summary.T12_min,0)>> and +<<n(s7.summary.T12_max,0)>> N·m (mean zero, because there is no load or friction), the crank bearing sees up to <<n(s7.summary.pin_max.F12/1000,2)>> kN near θ₂ ≈ <<n(s7.summary.pin_max_at.F12,0)>>°, and the shaking force reaches <<n(s8.stats.unbalanced.Fs_max/1000,2)>> kN (RMS <<n(s8.stats.unbalanced.Fs_rms/1000,2)>> kN).
+
+**Agreement between methods.** The graphical polygons, read with ruler precision (±0.5 mm), agree with the analytical vector-loop solution to within <<n(max_dg_vel,1)>> % for velocities and <<n(max_dg_acc,1)>> % for accelerations. The instantaneous-centre method agrees to within <<n(max_dic,1)>> %; its largest error comes from reading a short (≈15 mm) radius at 1:10 scale. An independent multibody simulation, built the way Working Model builds a model (bodies, pins, slot, velocity motor) and integrated in time, reproduces every analytical quantity, including all pin forces and the motor torque, to better than 10⁻⁷ over the whole revolution.
+
+**Balancing recommendation.** Counterweights on the two ground-pivoted links reduce the RMS shaking force by <<n(-pct(s8.stats.berkof_lowen.Fs_rms, s8.stats.unbalanced.Fs_rms),0)>> % with the exact Berkof–Lowen (four-bar) solution, and by <<n(-pct(s8.stats.optimal_lsq.Fs_rms, s8.stats.unbalanced.Fs_rms),0)>> % with a least-squares optimum. The residual is the reciprocating inertia of the slider plus half of link 5, which no rotating counterweight can cancel completely. The cost is extra moving mass (about <<n(s8.designs.berkof_lowen.m2c + s8.designs.berkof_lowen.m4c,1)>> kg at 120 mm radius) and a larger torque fluctuation, so a flywheel should be specified together with the counterweights.
+
+# Objectives {#objectives}
+
+- Select the dimensions of the linkage from the given data using the course data-selection (non-equality) equations and check mobility, the Grashof condition and the transmission angle.
+- Determine all positions of the links and joints graphically for 16 crank positions, the joint paths and the limits of motion.
+- Determine linear and angular velocities and accelerations at θ₂ = 60° graphically (vector polygons drawn to scale).
+- Locate all 15 instantaneous centres with Kennedy's theorem and use them to find the velocities of A, B, C and D.
+- Derive and solve the analytical (vector loop, complex number) equations for position, velocity and acceleration of all five moving links, and compare them with the graphical results.
+- Set up and solve the 14 × 14 matrix of dynamic joint forces and the driving torque at θ₂ = 60°, from free-body diagrams of every link.
+- Build a computational model of the mechanism and use it to compute paths, velocities, accelerations, pin forces, slider side load and driving torque over one revolution, and compare it with the other methods.
+- Determine the shaking force and shaking moment and develop an analytical strategy for balancing the mechanism.
+
+# Related Theory {#theory}
+
+**Mechanism, mobility and Grashof's criterion.** A mechanism is an assembly of rigid links joined by kinematic pairs that transmits a constrained motion (Week 1; Subic & Alam 2010). The degree of freedom of a planar mechanism follows from the Gruebler–Kutzbach equation,
+$$\text{DOF} = 3(n-1) - 2P_1 - P_2 = 3(6-1) - 2(7) - 0 = 1,$$
+with n = 6 links (including the frame), P₁ = 7 full joints (pins O, A, B, C, D, E and the slider pair) and P₂ = 0 half joints. One input, the crank angle θ₂, therefore fixes the configuration. Grashof's criterion, s + l ≤ p + q, guarantees that the shortest link of a four-bar can rotate fully (Week 1). When the shortest link is the crank next to the frame, the four-bar O-A-B-E is a crank–rocker.
+
+**Types of motion.** Link 2 rotates about a fixed axis, link 4 oscillates about a fixed axis, links 3 and 5 have general plane motion, and the slider (link 6) translates rectilinearly (Supplementary Guide, Figure 1).
+
+**Relative-motion (graphical) method.** For two points A and B of the same rigid link,
+$$\mathbf V_B = \mathbf V_A + \mathbf V_{B/A},\qquad |\mathbf V_{B/A}| = \omega\, r_{AB},\quad \mathbf V_{B/A}\perp AB,$$
+$$\mathbf a_B = \mathbf a_A + \mathbf a^n_{B/A} + \mathbf a^t_{B/A},$$
+$$a^n_{B/A} = \omega^2 r_{AB} = \frac{V_{B/A}^2}{r_{AB}}\ (\text{directed from B towards A}),\qquad a^t_{B/A} = \alpha\, r_{AB}\ (\perp AB).$$
+Absolute vectors start from the pole of the polygon. Vectors of points on ground-connected links start from the pole. Every normal component must be calculated before an acceleration polygon can be closed (Week 3). The polygon points of one link form an *image* similar to the link, which gives the velocity and acceleration of any further point, such as a mass centre.
+
+**Instantaneous centres.** An instantaneous centre (IC) is the point common to two links at which they have no relative velocity. A mechanism of n links has $C = n(n-1)/2$ ICs. Pins are permanent ICs, and the IC of a slider and its straight guide lies at infinity perpendicular to the guide. The *Aronhold–Kennedy theorem* states that the three ICs of any three links lie on one straight line, which locates the remaining ICs (Week 5). The velocity of any point is then $V = \omega\, r_{IC}$, perpendicular to the radius from the IC.
+
+**Analytical (complex-number vector-loop) method.** Every link is a vector $\mathbf R = l\,e^{j\theta} = l(\cos\theta + j\sin\theta)$ (Euler's identity). Writing each closed loop as a vector sum equal to zero and separating real (x) and imaginary (y) parts gives the position equations. Differentiating once, with $\tfrac{d}{dt}e^{j\theta} = j\omega e^{j\theta}$, gives the velocities, and differentiating again gives the accelerations, with $\tfrac{d}{dt}(j\omega e^{j\theta}) = (j\alpha - \omega^2)e^{j\theta}$ (Week 7).
+
+**Dynamic force analysis (matrix method).** Newton–Euler equations for each rigid link, $\sum \mathbf F = m\mathbf a_G$ and $\sum M_G = I_G\alpha$ (or D'Alembert's form $\sum\mathbf F - m\mathbf a_G = 0$), written for every moving link, give a linear system $[A]\{B\} = \{C\}$. Here [A] holds the geometry (unit coefficients and the R-vector components), {B} the unknown joint forces and the driving torque, and {C} the inertia terms (Week 9).
+
+**Shaking force, shaking moment and balancing.** The shaking force is the vector sum of all forces the moving links apply to the frame, $\mathbf F_s = \mathbf F_{21}+\mathbf F_{41}+\mathbf F_{61} = -\sum m_i\mathbf a_{Gi}$. The shaking moment is the reaction torque plus the moments of these ground forces (Week 10). A linkage is completely force-balanced when the total centre of mass of its moving links is stationary. Berkof & Lowen (1969) showed how to achieve this for a four-bar with counterweights on the two ground-pivoted links. Rotating-mass balancing uses $\sum m r = 0$ (static) and $\sum m r a = 0$ (dynamic) (Week 10). Reciprocating masses can only be partially balanced by rotating counterweights.
+
+**Computational multibody method.** Programs such as Working Model 2D describe each body by the coordinates (x, y, φ) of its mass centre, the joints by algebraic constraint equations Φ(q, t) = 0 and a motor by a driving constraint. They then solve $M\ddot q + \Phi_q^T\lambda = Q$ at every time step. The Lagrange multipliers λ are the joint reaction forces and the motor torque (Uicker et al. 2017; Norton 2012).
+
+# Data Selection and Parameters {#data}
+
+**Parameters given by the lecturer** (blank in the handout; each student receives their own). Example values used in this worked solution:
+
+| Given | Value |
+|---|---|
+| Crank length $l_2$ = OA | <<n(p.OA*1000,0)>> mm |
+| Angle of the ternary link $\beta$ = ∠BAC | <<n(p.beta_deg,0)>>° (C below AB) |
+| Angle of the frame line OE, $\theta_1$ | <<n(p.theta1_deg,0)>>° above horizontal |
+| Crank speed $n_2$ | <<n(p.n2_rpm,0)>> rpm, anticlockwise, constant ($\alpha_2 = 0$) |
+
+**Parameters selected by the student** with the data-selection (non-equality) equations of Week 1:
+$$\overline{OE} = \overline{CD} = 4\,\overline{OA},\qquad \overline{AC} = \tfrac35\,\overline{AB},\qquad H = \tfrac{\overline{OA}}{4},$$
+$$\overline{OA}+\overline{AB} < \overline{OE}+\overline{BE},\qquad \overline{OA}+\overline{OE} < \overline{AB}+\overline{BE}.$$
+
+| Parameter | Equation | Value |
+|---|---|---|
+| $l_1$ = OE | 4·OA | <<n(p.OE*1000,0)>> mm |
+| $l_5$ = CD | 4·OA | <<n(p.CD*1000,0)>> mm |
+| H | OA/4 | <<n(p.H*1000,1)>> mm |
+| $l_3$ = AB | selected | <<n(p.AB*1000,0)>> mm |
+| $l_4$ = BE | selected | <<n(p.BE*1000,0)>> mm |
+| AC | 3/5·AB | <<n(p.AC*1000,0)>> mm |
+| $\omega_2$ | $2\pi n_2/60$ | <<n(p.omega2,4)>> rad/s |
+
+Table: Table 1 – Derived and selected dimensions.
+
+| Check | LHS (mm) | RHS (mm) | Satisfied |
+|---|---|---|---|
+<% for chk in p.checks %>
+| << chk[0] >> | <<n(chk[1]*1000,0)>> | <<n(chk[2]*1000,0)>> | << "yes" if chk[3] else "NO" >> |
+<% endfor %>
+
+Table: Table 2 – Verification of the selection inequalities and Grashof's criterion.
+
+**Why AB = <<n(p.AB*1000,0)>> mm and BE = <<n(p.BE*1000,0)>> mm?** Many pairs satisfy the two inequalities. This pair was chosen because it (i) keeps a comfortable margin on both inequalities, (ii) makes OA the shortest link, so the crank rotates fully (crank–rocker), (iii) keeps the four-bar transmission angle between <<n(R.transmission.fourbar_min,1)>>° and <<n(R.transmission.fourbar_max,1)>>° (good practice is > 40°), and the slider transmission angle above <<n(R.transmission.slider_min,1)>>°, and (iv) reproduces the configuration of the handout figure, with BE almost vertical (θ₄ = <<n(d.theta4,1)>>°) at θ₂ = 60°.
+
+**Mass properties (handout item 6).**
+
+| Link | Mass (kg) | $I_G$ (kg·m²) | Mass-centre location |
+|---|---|---|---|
+| 2 – crank | <<n(p.masses.m2,1)>> | <<n(p.inertias.I2,3)>> | G₂ at OA/2 |
+| 3 – ternary link | <<n(p.masses.m3,1)>> | <<n(p.inertias.I3,3)>> | G₃ at AB/2 from A along the bisector of β (β/2 below AB) |
+| 4 – rocker | <<n(p.masses.m4,1)>> | <<n(p.inertias.I4,3)>> | G₄ at EB/2 |
+| 5 – connecting rod | <<n(p.masses.m5,1)>> | <<n(p.inertias.I5,3)>> | G₅ at CD/2 |
+| 6 – slider | <<n(p.masses.m6,1)>> | – (translates) | G₆ at D |
+
+Table: Table 3 – Mass properties (handout item 6). G₃ is placed literally as specified, “at β/2 and AB/2”: on the bisector of β, AB/2 = <<n(p.AB*500,0)>> mm from A. The Week 9 hand sketch instead marks G₃ at the centroid of triangle ABC, which is also Working Model's default for a polygon. Section 6 shows this choice changes the joint forces by only 1–3 %, but confirm with your lecturer which one is intended.
+
+**Coordinate system and sign convention.** Origin at the crank pivot O, x horizontal to the right, y vertically up. All angles are measured anticlockwise (CCW) from +x. Positive ω and α are CCW. θ₅ is the angle of the vector C→D. The slider path is the horizontal line y = −H.
+
+# 1. Graphical Position Analysis {#sec1}
+
+**Procedure (Week 1 "Steps for position drawing").** For each crank angle θ₂:
+
+a) With centre O, draw OA at θ₂.
+b) With centre O, draw OE at θ₁ (fixed) and mark E.
+c) With centre A, strike an arc of radius AB. With centre E, strike an arc of radius BE. Their intersection (the one on the same side as in the handout figure) is B.
+d) With centre A, draw AC at angle β below AB and mark C (AC = <<n(p.AC*1000,0)>> mm). Join C to B; triangle ABC is link 3.
+e) Draw the slider path, a horizontal line H = <<n(p.H*1000,0)>> mm below O.
+f) With centre C, strike an arc of radius CD. Its intersection with the slider path (to the right of C) is D.
+
+![Figure 1 – Sample working for one position (θ₂ = 60°): construction steps (a)–(f). Drawn to scale 1:10 (print at 100 %).](figures/fig2_position_construction.<<figext>>){width=178mm}
+
+![Figure 2 – Space diagram at the given position θ₂ = 60° with link numbers, angle conventions and mass centres G₂–G₆ (scale 1:10).](figures/fig1_space_diagram.<<figext>>){width=178mm}
+
+Repeating the construction every 22.5° gives the 16 subsequent positions of link 2 (position 1 = the given position θ₂ = 60°; positions numbered anticlockwise). The joints of each position are joined to show the path of every moving joint (Figure 3).
+
+![Figure 3 – Sixteen positions of the mechanism, the paths S_A, S_B, S_C, S_D of the moving joints and the limits of motion (scale 1:10).](figures/fig3_16_positions.<<figext>>){width=178mm}
+
+::: {.small}
+| Pos. | θ₂ (°) | θ₃ (°) | θ₄ (°) | θ₅ (°) | S (mm) | A (x, y) mm | B (x, y) mm | C (x, y) mm | D (x, y) mm |
+|---|---|---|---|---|---|---|---|---|---|
+<% for r in s1.positions16 %>
+| << r.i >> | <<n(r.theta2,1)>> | <<n(r.theta3,2)>> | <<n(r.theta4,2)>> | <<n(r.theta5,2)>> | <<n(r.S*1000,1)>> | <<n(r.Ax*1000,1)>>, <<n(r.Ay*1000,1)>> | <<n(r.Bx*1000,1)>>, <<n(r.By*1000,1)>> | <<n(r.Cx*1000,1)>>, <<n(r.Cy*1000,1)>> | <<n(r.Dx*1000,1)>>, <<n(r.Dy*1000,1)>> |
+<% endfor %>
+
+Table: Table 4 – Sixteen-position analysis of all five moving links (link 2: θ₂; link 3: θ₃; link 4: θ₄; link 5: θ₅; link 6: S). Values are measured from the 1:10 drawing and agree with the analytical solution of Section 5.
+:::
+
+**Paths of the moving joints.**
+
+- **S_A**, the path of A, is a full circle of radius OA = <<n(p.OA*1000,0)>> mm about O (pure rotation of link 2).
+- **S_B**, the path of B, is a circular arc of radius BE = <<n(p.BE*1000,0)>> mm about E. B oscillates between B′ and B″ (link 4 is a rocker).
+- **S_C**, the path of C, is a closed oval *coupler curve*, because link 3 has general plane motion.
+- **S_D**, the path of D, is a straight segment on y = −H between the limits D_L and D_R (link 6 translates).
+
+**Limits of motion.**
+
+| Link | Quantity | Minimum | Maximum | Notes |
+|---|---|---|---|---|
+| 2 (crank) | θ₂ | 0° | 360° | full rotation (Grashof crank–rocker) |
+| 3 (coupler) | θ₃ | <<n(R.ranges.theta3[0],2)>>° | <<n(R.ranges.theta3[1],2)>>° | ω₃ = 0 at θ₂ = <<n(s1.limits.link3[0].theta2,1)>>° and <<n(s1.limits.link3[1].theta2,1)>>° |
+| 4 (rocker) | θ₄ | <<n(rk_min.theta4,2)>>° (B′) | <<n(rk_max.theta4,2)>>° (B″) | swing <<n(rk_swing,2)>>°; toggle positions at θ₂ = <<n(rk_min.theta2,2)>>° (OA and AB in line, extended) and <<n(rk_max.theta2,2)>>° (folded) |
+| 5 (rod) | θ₅ | <<n(R.ranges.theta5[0],2)>>° | <<n(R.ranges.theta5[1],2)>>° | ω₅ = 0 at θ₂ = <<n(s1.limits.link5[0].theta2,1)>>° and <<n(s1.limits.link5[1].theta2,1)>>° |
+| 6 (slider) | S | <<n(S_min*1000,1)>> mm (D_L) | <<n(S_max*1000,1)>> mm (D_R) | stroke <<n(stroke*1000,1)>> mm; D_R at θ₂ = <<n(th_DR,2)>>°, D_L at θ₂ = <<n(th_DL,2)>>° |
+
+Table: Table 5 – Limits of motion. The extreme positions are where the corresponding velocity vanishes (found exactly by root-finding on the analytical solution).
+
+The slider travels from D_R to D_L (leftwards) while the crank turns <<n(ang_ret,1)>>°, and back while the crank turns <<n(ang_fwd,1)>>°, giving a time ratio Q = <<n(ang_fwd,1)>>/<<n(ang_ret,1)>> = <<n(Q,3)>>. The rocker's two strokes take <<n(rk_ang1,1)>>° and <<n(rk_ang2,1)>>° of crank rotation, so it is almost symmetrical. Figure 4 shows how the link angles and the slider position vary with crank angle.
+
+![Figure 4 – Link angles θ₃, θ₄, θ₅ and slider position S over one revolution (dots: the 16 positions).](figures/fig4_link_angles.<<figext>>){width=170mm}
+
+# 2. Graphical Velocity Analysis (θ₂ = 60°) {#sec2}
+
+**Known input.** The crank turns about the fixed pivot O, so
+$$V_A = \omega_2\,\overline{OA} = <<n(p.omega2,4)>> \times <<n(p.OA,3)>> = <<n(mag(d.VA),3)>>\ \text{m/s},$$
+$$\mathbf V_A \perp OA,\ \text{pointing at } \theta_2 + 90^\circ = <<n(ang(d.VA),0)>>^\circ \ (\omega_2\ \text{CCW}).$$
+
+**Relative-motion equations (course steps, Week 3/9 "Help with the Major Assignment").** Underlining shows what is known: two lines = magnitude and direction known, one line = direction only.
+
+$$\begin{aligned}
+&\text{Step 1:} && \underset{\perp BE}{\mathbf V_B} = \underset{\perp OA\ (\text{known})}{\mathbf V_A} + \underset{\perp AB}{\mathbf V_{B/A}}\\
+&\text{Step 2:} && \mathbf V_C = \mathbf V_A + \underset{\perp AC}{\mathbf V_{C/A}} = \mathbf V_B + \underset{\perp BC}{\mathbf V_{C/B}}\\
+&\text{Step 3:} && \underset{\parallel x\text{-}x}{\mathbf V_D} = \mathbf V_C + \underset{\perp CD}{\mathbf V_{D/C}}\\
+&\text{Step 4:} && \mathbf V_{G3} = \mathbf V_A + \underset{\perp AG_3}{\mathbf V_{G3/A}} = \mathbf V_B + \underset{\perp BG_3}{\mathbf V_{G3/B}}
+\end{aligned}$$
+
+**Construction (scale 1 m/s = 20 mm).** From the pole *o* draw *oa* = V_A (<<n(s2.measured["V_A"].length_exact,1)>> mm long, at <<n(ang(d.VA),0)>>°). Through *a* draw a line ⊥AB, and through *o* a line ⊥BE. They meet at *b* (Step 1). Through *a* draw ⊥AC and through *b* draw ⊥BC; they meet at *c* (Step 2), so the triangle *abc* is the velocity image of link 3. Through *o* draw a horizontal line and through *c* a line ⊥CD; they meet at *d* (Step 3). Point *g₃* is the intersection of ⊥AG₃ through *a* and ⊥BG₃ through *b*. Because G₂, G₄ and G₅ are mid-points of OA, EB and CD, the points *g₂*, *g₄*, *g₅* are the mid-points of *oa*, *ob* and *cd*.
+
+![Figure 5 – Velocity vector polygon at θ₂ = 60°, drawn to scale (1 m/s = 20 mm; print at 100 %).](figures/fig5_velocity_polygon.<<figext>>){width=178mm}
+
+| Vector | Direction rule | Length on drawing (mm) | Magnitude (m/s) | Direction (°) |
+|---|---|---|---|---|
+<% for name, m in s2.measured.items() %>
+| <<vname(name)>> | <<m.desc>> | <<n(m.length,1)>> | <<n(m.value,3)>> | <<n(m.angle,1)>> |
+<% endfor %>
+
+Table: Table 6 – Velocities read from the polygon (lengths to the nearest 0.5 mm, angles to the nearest 0.5°, value = length ÷ 20 mm per m/s).
+
+**Angular velocities.** Each relative velocity is ω × (link length). Its sense follows from the direction of the relative velocity: for example, V_B/A points at <<n(s2.measured["V_B/A"].angle,1)>>°, which is AB (<<n(d.theta3,1)>>°) turned *clockwise* by 90°, so link 3 rotates clockwise.
+
+$$\omega_3 = \frac{V_{B/A}}{\overline{AB}} = \frac{<<n(s2.measured["V_B/A"].value,3)>>}{<<n(p.AB,3)>>} = <<n(abs(s2.angular.omega3),3)>>\ \text{rad/s (CW)},$$
+$$\omega_4 = \frac{V_B}{\overline{BE}} = \frac{<<n(s2.measured["V_B"].value,3)>>}{<<n(p.BE,3)>>} = <<n(abs(s2.angular.omega4),3)>>\ \text{rad/s (CCW)},$$
+$$\omega_5 = \frac{V_{D/C}}{\overline{CD}} = \frac{<<n(s2.measured["V_D/C"].value,3)>>}{<<n(p.CD,3)>>} = <<n(abs(s2.angular.omega5),3)>>\ \text{rad/s (CW)},$$
+$$\text{check: } \frac{V_{C/A}}{\overline{AC}} = <<n(abs(s2.angular.omega3_check),3)>>\ \text{rad/s} \approx \omega_3.$$
+
+| Link | ω (rad/s), graphical | Sense |
+|---|---|---|
+| 2 | <<n(p.omega2,3)>> (input) | CCW |
+| 3 | <<n(abs(s2.angular.omega3),3)>> | CW |
+| 4 | <<n(abs(s2.angular.omega4),3)>> | CCW |
+| 5 | <<n(abs(s2.angular.omega5),3)>> | CW |
+| 6 | 0 (translation), V_D = <<n(s2.measured["V_D"].value,3)>> m/s to the left | – |
+
+Table: Table 7 – Angular velocities from the velocity polygon.
+
+# 3. Graphical Acceleration Analysis (θ₂ = 60°) {#sec3}
+
+**Normal components (calculated first).** α₂ = 0, so $a^t_A = 0$ and $a_A = a^n_A$. The other normal components use the velocities read from the polygon (Table 6) and always point from the point towards the centre of the relative rotation.
+
+| Component | Formula | Value (m/s²) | Direction |
+|---|---|---|---|
+| $a^n_A$ | $\omega_2^2\,\overline{OA}$ = <<n(p.omega2,3)>>² × <<n(p.OA,3)>> | <<n(s3.normal.A,2)>> | A → O (∥AO) |
+| $a^n_B$ | $V_B^2/\overline{BE}$ = <<n(s3.v_inputs.VB,3)>>² / <<n(p.BE,3)>> | <<n(s3.normal.B,2)>> | B → E (∥BE) |
+| $a^n_{B/A}$ | $V_{B/A}^2/\overline{AB}$ = <<n(s3.v_inputs.VBA,3)>>² / <<n(p.AB,3)>> | <<n(s3.normal.BA,2)>> | B → A (∥BA) |
+| $a^n_{C/A}$ | $V_{C/A}^2/\overline{AC}$ = <<n(s3.v_inputs.VCA,3)>>² / <<n(p.AC,3)>> | <<n(s3.normal.CA,2)>> | C → A (∥CA) |
+| $a^n_{C/B}$ | $V_{C/B}^2/\overline{BC}$ = <<n(s3.v_inputs.VCB,3)>>² / <<n(s3.radii.rBC,4)>> | <<n(s3.normal.CB,2)>> | C → B (∥CB) |
+| $a^n_{D/C}$ | $V_{D/C}^2/\overline{CD}$ = <<n(s3.v_inputs.VDC,3)>>² / <<n(p.CD,3)>> | <<n(s3.normal.DC,2)>> | D → C (∥DC) |
+| $a^n_{G3/A}$ | $V_{G3/A}^2/\overline{AG_3}$ = <<n(s3.v_inputs.VG3A,3)>>² / <<n(s3.radii.rAG3,3)>> | <<n(s3.normal.G3A,2)>> | G₃ → A |
+| $a^n_{G3/B}$ | $V_{G3/B}^2/\overline{BG_3}$ = <<n(s3.v_inputs.VG3B,3)>>² / <<n(s3.radii.rBG3,4)>> | <<n(s3.normal.G3B,2)>> | G₃ → B |
+
+Table: Table 8 – Normal (centripetal) acceleration components. BC = <<n(s3.radii.rBC*1000,1)>> mm and BG₃ = <<n(s3.radii.rBG3*1000,1)>> mm are measured from the space diagram.
+
+**Relative-acceleration equations (course steps).**
+$$\begin{aligned}
+&\text{Step 1:} && \underset{\parallel BE}{\mathbf a^n_B} + \underset{\perp BE}{\mathbf a^t_B} = \underset{\parallel AO}{\mathbf a^n_A} + \underset{\perp OA\,(=0)}{\mathbf a^t_A} + \underset{\parallel BA}{\mathbf a^n_{B/A}} + \underset{\perp AB}{\mathbf a^t_{B/A}}\\
+&\text{Step 2:} && \mathbf a_A + \underset{\parallel CA}{\mathbf a^n_{C/A}} + \underset{\perp AC}{\mathbf a^t_{C/A}} = \mathbf a_B + \underset{\parallel CB}{\mathbf a^n_{C/B}} + \underset{\perp BC}{\mathbf a^t_{C/B}}\\
+&\text{Step 3:} && \underset{\parallel x\text{-}x}{\mathbf a_D} = \mathbf a_C + \underset{\parallel DC}{\mathbf a^n_{D/C}} + \underset{\perp CD}{\mathbf a^t_{D/C}}\\
+&\text{Step 4:} && \mathbf a_A + \mathbf a^n_{G3/A} + \underset{\perp G_3A}{\mathbf a^t_{G3/A}} = \mathbf a_B + \mathbf a^n_{G3/B} + \underset{\perp G_3B}{\mathbf a^t_{G3/B}}
+\end{aligned}$$
+
+**Construction (scale 1 mm = 2.5 m/s²).** From the pole *o′* draw *o′a′* = a_A (<<n(s3.measured["a_A"].length_exact,1)>> mm, pointing from A towards O, i.e. at <<n(ang(d.aA),0)>>°). From *a′* draw $a^n_{B/A}$ (B→A direction) and through its tip a line ⊥AB. From *o′* draw $a^n_B$ (B→E direction) and through its tip a line ⊥BE. The two lines meet at *b′*. From *a′* draw $a^n_{C/A}$ with a line ⊥AC through its tip, and from *b′* draw $a^n_{C/B}$ with a line ⊥BC through its tip; they meet at *c′*. From *c′* draw $a^n_{D/C}$ (only <<n(s3.measured["a_D/C^n"].length_exact,2)>> mm long) with a line ⊥CD through its tip; this meets the horizontal through *o′* at *d′*. Point *g₃′* comes from Step 4. Points *g₂′* and *g₄′* are the mid-points of *o′a′* and *o′b′*, and *g₅′* is the mid-point of *c′d′*.
+
+![Figure 6 – Acceleration vector polygon at θ₂ = 60°, drawn to scale (1 mm = 2.5 m/s²; print at 100 %).](figures/fig6_acceleration_polygon.<<figext>>){width=178mm}
+
+::: {.small}
+| Vector | Construction | Length (mm) | Magnitude (m/s²) | Direction (°) |
+|---|---|---|---|---|
+<% for name, m in s3.measured.items() %>
+| <<aname(name)>> | <<m.desc.replace("a_A^n", "$a^n_A$").replace("a_A^t", "$a^t_A$")>> | <<n(m.length,1)>> | <<n(m.value,1)>> | <<n(m.angle,1)>> |
+<% endfor %>
+
+Table: Table 9 – Accelerations read from the polygon (lengths to the nearest 0.5 mm; value = length × 2.5 m/s² per mm).
+:::
+
+**Angular accelerations** come from the tangential components ($a^t = \alpha\,r$), with the sense taken from the polygon:
+$$\alpha_3 = \frac{a^t_{B/A}}{\overline{AB}} = \frac{<<n(s3.measured["a_B/A^t"].value,1)>>}{<<n(p.AB,3)>>} = <<n(abs(s3.angular.alpha3),1)>>\ \text{rad/s}^2\ (\text{CCW}),$$
+$$\alpha_4 = \frac{a^t_{B}}{\overline{BE}} = \frac{<<n(s3.measured["a_B^t"].value,1)>>}{<<n(p.BE,3)>>} = <<n(abs(s3.angular.alpha4),1)>>\ \text{rad/s}^2\ (\text{CCW}),$$
+$$\alpha_5 = \frac{a^t_{D/C}}{\overline{CD}} = \frac{<<n(s3.measured["a_D/C^t"].value,1)>>}{<<n(p.CD,3)>>} = <<n(abs(s3.angular.alpha5),1)>>\ \text{rad/s}^2\ (\text{CCW}),$$
+$$\text{check: } \frac{a^t_{C/A}}{\overline{AC}} = <<n(abs(s3.angular.alpha3_check),1)>>\ \text{rad/s}^2 \approx \alpha_3.$$
+
+| Quantity | Graphical value | Direction |
+|---|---|---|
+| $a_A$ | <<n(s3.measured["a_A"].value,1)>> m/s² | <<n(s3.measured["a_A"].angle,1)>>° |
+| $a_B$ | <<n(s3.measured["a_B"].value,1)>> m/s² | <<n(s3.measured["a_B"].angle,1)>>° |
+| $a_C$ | <<n(s3.measured["a_C"].value,1)>> m/s² | <<n(s3.measured["a_C"].angle,1)>>° |
+| $a_D$ | <<n(s3.measured["a_D"].value,1)>> m/s² | <<n(s3.measured["a_D"].angle,1)>>° (to the left) |
+| $a_{G2}, a_{G3}, a_{G4}, a_{G5}, a_{G6}$ | <<n(s3.measured["a_G2"].value,1)>>, <<n(s3.measured["a_G3"].value,1)>>, <<n(s3.measured["a_G4"].value,1)>>, <<n(s3.measured["a_G5"].value,1)>>, <<n(s3.measured["a_G6"].value,1)>> m/s² | <<n(s3.measured["a_G2"].angle,1)>>°, <<n(s3.measured["a_G3"].angle,1)>>°, <<n(s3.measured["a_G4"].angle,1)>>°, <<n(s3.measured["a_G5"].angle,1)>>°, <<n(s3.measured["a_G6"].angle,1)>>° |
+| $\alpha_3, \alpha_4, \alpha_5$ | <<n(abs(s3.angular.alpha3),1)>>, <<n(abs(s3.angular.alpha4),1)>>, <<n(abs(s3.angular.alpha5),1)>> rad/s² | all CCW |
+
+Table: Table 10 – Summary of the graphical acceleration analysis.
+
+# 4. Instantaneous Centres and Velocities (Kennedy's Theorem) {#sec4}
+
+**Number of ICs (Kennedy Part 1).** With n = 6 links, $C = \dfrac{n(n-1)}{2} = \dfrac{6\times5}{2} = 15$.
+
+**Known ICs by inspection (7).** The pins give I₁₂ = O, I₂₃ = A, I₃₄ = B, I₁₄ = E, I₃₅ = C and I₅₆ = D. The slider gives I₁₆, at infinity perpendicular to the horizontal guide (any vertical line passes through I₁₆).
+
+**Unknown ICs (8).** I₁₃, I₂₄, I₁₅, I₃₆, I₂₅, I₄₅, I₂₆ and I₄₆.
+
+**Kennedy circle (Parts 2 and 3).** Six points numbered 1–6 are placed on a circle. Known ICs are drawn as solid sides and unknown ones as dashed sides. An unknown side can be found once it closes two triangles whose other four sides are known: by Kennedy's theorem the unknown IC lies on both corresponding lines, so it is their intersection.
+
+![Figure 7 – Kennedy circle, step by step: in each step the dashed red side is closed by the blue and the green triangles.](figures/fig8_kennedy_circle.<<figext>>){width=160mm}
+
+| Step | Unknown IC | Line 1 (through) | Line 2 (through) | Location found (x, y) mm |
+|---|---|---|---|---|
+<% set steps = [("13","I₁₂ (O), I₂₃ (A) – line OA","I₁₄ (E), I₃₄ (B) – line EB"),("24","I₁₂ (O), I₁₄ (E) – line OE","I₂₃ (A), I₃₄ (B) – line AB"),("15","I₁₃, I₃₅ (C)","I₁₆ (∞ vertical), I₅₆ (D) – vertical through D"),("36","I₃₅ (C), I₅₆ (D) – line CD","I₁₃, I₁₆ – vertical through I₁₃"),("25","I₂₃ (A), I₃₅ (C) – line AC","I₁₂ (O), I₁₅"),("45","I₃₄ (B), I₃₅ (C) – line BC","I₁₄ (E), I₁₅"),("26","I₁₂ (O), I₁₆ – vertical through O","I₂₃ (A), I₃₆"),("46","I₁₄ (E), I₁₆ – vertical through E","I₃₄ (B), I₃₆")] %>
+<% for st in steps %>
+| <<loop.index>> | I<<st[0]>> | <<st[1]>> | <<st[2]>> | <<n(s4.ics[st[0]][0]*1000,1)>>, <<n(s4.ics[st[0]][1]*1000,1)>> |
+<% endfor %>
+
+Table: Table 11 – Location of the unknown ICs. A third Kennedy line through each IC was used as a check; all were collinear to better than 10⁻¹⁰ m.
+
+![Figure 8 – All instantaneous centres and the velocities of A, B, C, D drawn to scale on the mechanism (space 1:10; velocity 1 m/s = 4 mm). I₁₅ lies off the sheet.](figures/fig7_ic_diagram.<<figext>>){width=178mm}
+
+![Figure 8b – Overview of all 15 instantaneous centres at scale 1:50, including I₁₅ (about 5 m above the slider), with the Kennedy lines that locate it; I₁₆ is at infinity in the vertical direction.](figures/fig7b_ic_overview.<<figext>>){width=84mm}
+
+**Velocities from the ICs** (radii read from the 1:10 drawing to the nearest 0.5 mm, i.e. 5 mm full size):
+
+| Step | Equation | Radius (mm, full size) | Result |
+|---|---|---|---|
+| 1 | $V_A = \omega_2\, r_{I_{12}A}$ | <<n(s4.radii.r12A*1000,0)>> | V_A = <<n(s4.measured.VA,3)>> m/s ⊥ I₁₂A |
+| 2 | $\omega_3 = V_A / r_{I_{13}A}$ (link 3 turns about I₁₃) | <<n(s4.radii.r13A*1000,0)>> | ω₃ = <<n(s4.measured.omega3,3)>> rad/s CW |
+| 3 | $V_B = \omega_3\, r_{I_{13}B}$ | <<n(s4.radii.r13B*1000,0)>> | V_B = <<n(s4.measured.VB,3)>> m/s ⊥ I₁₃B |
+| 4 | $V_C = \omega_3\, r_{I_{13}C}$ | <<n(s4.radii.r13C*1000,0)>> | V_C = <<n(s4.measured.VC,3)>> m/s ⊥ I₁₃C |
+| 5 | $\omega_4 = V_B / r_{I_{14}B}$ | <<n(s4.radii.r14B*1000,0)>> | ω₄ = <<n(s4.measured.omega4,3)>> rad/s CCW |
+| 6 | $V_D = \omega_2\, r_{I_{12}I_{26}}$ (I₂₆ is a point of link 2 moving with the slider) | <<n(s4.radii.r12_26*1000,0)>> | V_D = <<n(s4.measured.VD,3)>> m/s ← |
+| 7 | $\omega_5 = V_C / r_{I_{15}C}$, $V_D = \omega_5\, r_{I_{15}D}$ (I₁₅ off-sheet, coordinates from the Kennedy lines) | <<n(s4.radii.r15C*1000,0)>>, <<n(s4.radii.r15D*1000,0)>> | ω₅ = <<n(s4.measured.omega5,3)>> rad/s CW; V_D = <<n(s4.measured.omega5*s4.radii.r15D,3)>> m/s |
+
+Table: Table 12 – Velocities of A, B, C and D using the instantaneous centres.
+
+The IC results agree with the velocity polygon and the analytical solution (Table 16). The largest deviation (V_D via I₂₆, <<n(pct(s4.measured.VD, mag(d.VD)),1)>> %) comes from reading the short radius O–I₂₆ (exact value <<n(s4.ics["26"][1]*1000,1)>> mm) to ±5 mm at 1:10 scale. Using I₁₅ (step 7), or drawing that region at a larger scale, removes the error. The angular-velocity-ratio theorem gives a neat check: I₂₄ lies on the line of centres OE, so ω₄/ω₂ = I₁₂I₂₄ / I₁₄I₂₄ = <<n(s4.exact.omega4_ratio/p.omega2,4)>> → ω₄ = <<n(s4.exact.omega4_ratio,3)>> rad/s.
+
+# 5. Analytical Solution — Vector Loops and Complex Numbers {#sec5}
+
+The course template "Approach for the analytical part of the major assignment" (Week 7) splits the mechanism into Part 1 (crank, point A), Part 2 (coupler and rocker, points B and C) and Part 3 (slider, point D).
+
+**Vectors.** $\mathbf R_2 = l_2e^{j\theta_2}$ (O→A), $\mathbf R_3 = l_3e^{j\theta_3}$ (A→B), $\mathbf R_4 = l_4e^{j\theta_4}$ (E→B), $\mathbf R_1 = l_1e^{j\theta_1}$ (O→E), $\mathbf R_{AC} = \overline{AC}\,e^{j(\theta_3-\beta)}$ (A→C; C lies below AB), $\mathbf R_5 = l_5e^{j\theta_5}$ (C→D) and $\mathbf R_D = S - jH$ (O→D).
+
+$$\text{Loop 1 (O-A-B-E):}\quad l_2e^{j\theta_2} + l_3e^{j\theta_3} = l_1e^{j\theta_1} + l_4e^{j\theta_4}$$
+$$\text{Loop 2 (O-A-C-D):}\quad l_2e^{j\theta_2} + \overline{AC}\,e^{j(\theta_3-\beta)} + l_5e^{j\theta_5} = S - jH$$
+
+## 5.1 Position analysis
+
+**Part 1 – crank (point A).**
+$$x_A = l_2\cos\theta_2 = <<n(p.OA*1000,0)>>\cos60^\circ = <<n(d.pos_A[0]*1000,2)>>\ \text{mm},\qquad y_A = l_2\sin\theta_2 = <<n(d.pos_A[1]*1000,2)>>\ \text{mm}.$$
+
+**Part 2 – coupler and rocker (points B and C).** Following the template, let $\mathbf R_{AE} = \mathbf R_1 - \mathbf R_2 = \text{Re} + j\,\text{Im}$:
+$$\text{Re} = l_1\cos\theta_1 - l_2\cos\theta_2 = <<n(p.OE,3)>>\cos<<n(p.theta1_deg,0)>>^\circ - <<n(p.OA,3)>>\cos60^\circ = <<n(d.template.Re,5)>>\ \text{m}$$
+$$\text{Im} = l_1\sin\theta_1 - l_2\sin\theta_2 = <<n(p.OE,3)>>\sin<<n(p.theta1_deg,0)>>^\circ - <<n(p.OA,3)>>\sin60^\circ = <<n(d.template.Im,5)>>\ \text{m}$$
+Loop 1 becomes $l_3e^{j\theta_3} = \text{Re} + j\text{Im} + l_4e^{j\theta_4}$. Taking the squared magnitude of both sides eliminates θ₃:
+$$\text{Re}\cos\theta_4 + \text{Im}\sin\theta_4 + C = 0,\qquad C = \frac{\text{Re}^2+\text{Im}^2+l_4^2-l_3^2}{2l_4} = <<n(d.template.C,5)>>\ \text{m}.$$
+With $\sin\theta_4 = \dfrac{2t}{1+t^2}$, $\cos\theta_4 = \dfrac{1-t^2}{1+t^2}$ and $t = \tan(\theta_4/2)$:
+$$(C-\text{Re})\,t^2 + 2\,\text{Im}\,t + (C+\text{Re}) = 0,$$
+$$t = \frac{-\text{Im}\pm\sqrt{\text{Re}^2+\text{Im}^2-C^2}}{C-\text{Re}} = \frac{<<n(-d.template.Im,5)>> \pm <<n(d.template.sqrt,5)>>}{<<n(d.template.C - d.template.Re,5)>>}.$$
+The two roots are $t = <<n(d.template.t_minus,4)>>$ (θ₄ = <<n(d.template.th4_minus,3)>>°) and $t = <<n(d.template.t_plus,4)>>$ (θ₄ = <<n(d.template.th4_plus,3)>>°). The template takes the solution with 0 < θ₄ < π, which is the open configuration of the handout figure (B above E):
+$$\theta_4 = <<n(d.theta4,3)>>^\circ\quad(\text{the “−” sign here}).$$
+From the triangle AB′B of the template:
+$$\theta_3 = 2\arctan\frac{\text{Im} + l_4\sin\theta_4}{l_3 + \text{Re} + l_4\cos\theta_4} = 2\arctan\frac{<<n(d.template.Im + p.BE*math.sin(math.radians(d.theta4)),5)>>}{<<n(p.AB + d.template.Re + p.BE*math.cos(math.radians(d.theta4)),5)>>} = <<n(d.theta3,3)>>^\circ.$$
+Hence $\mathbf R_B = \mathbf R_1 + l_4e^{j\theta_4}$, i.e. B = (<<n(d.pos_B[0]*1000,2)>>, <<n(d.pos_B[1]*1000,2)>>) mm, and $\mathbf R_C = \mathbf R_2 + \overline{AC}e^{j(\theta_3-\beta)}$ with θ₃ − β = <<n(d.theta3 - p.beta_deg,3)>>°, i.e. C = (<<n(d.pos_C[0]*1000,2)>>, <<n(d.pos_C[1]*1000,2)>>) mm. Check: |B − A| = <<n(p.AB*1000,3)>> mm ✓.
+
+**Part 3 – slider (point D).** The imaginary part of loop 2 is $y_C + l_5\sin\theta_5 = -H$ (the slider runs H *below* O, so $y_D = -H$):
+$$\theta_5 = \arcsin\!\left(\frac{-H - y_C}{l_5}\right) = \arcsin\!\left(\frac{-<<n(p.H*1000,1)>> - <<n(d.pos_C[1]*1000,2)>>}{<<n(p.CD*1000,0)>>}\right) = <<n(d.theta5,3)>>^\circ,$$
+$$S = x_D = x_C + l_5\cos\theta_5 = <<n(d.pos_C[0]*1000,2)>> + <<n(p.CD*1000,0)>>\cos(<<n(d.theta5,3)>>^\circ) = <<n(d.S*1000,2)>>\ \text{mm}.$$
+
+**Mass-centre positions.** $\mathbf R_{G2} = \tfrac{l_2}{2}e^{j\theta_2}$, $\mathbf R_{G3} = \mathbf R_A + \tfrac{l_3}{2}e^{j(\theta_3-\beta/2)}$, $\mathbf R_{G4} = \mathbf R_1 + \tfrac{l_4}{2}e^{j\theta_4}$, $\mathbf R_{G5} = \mathbf R_C + \tfrac{l_5}{2}e^{j\theta_5}$, $\mathbf R_{G6} = \mathbf R_D$.
+
+## 5.2 Velocity analysis
+
+Differentiating loop 1 with respect to time (θ₁, l's constant):
+$$j l_2\omega_2e^{j\theta_2} + j l_3\omega_3e^{j\theta_3} - j l_4\omega_4e^{j\theta_4} = 0 \quad\Leftrightarrow\quad \mathbf V_A + \mathbf V_{B/A} = \mathbf V_B.$$
+The real and imaginary parts give two linear equations in ω₃, ω₄. Solving them (Week 7):
+$$\omega_3 = \frac{l_2\omega_2\sin(\theta_4-\theta_2)}{l_3\sin(\theta_3-\theta_4)} = \frac{<<n(p.OA,3)>>(<<n(p.omega2,4)>>)\sin(<<n(d.theta4-60,3)>>^\circ)}{<<n(p.AB,3)>>\sin(<<n(d.theta3-d.theta4,3)>>^\circ)} = <<n(d.omega3,4)>>\ \text{rad/s (CW)}$$
+$$\omega_4 = \frac{l_2\omega_2\sin(\theta_2-\theta_3)}{l_4\sin(\theta_4-\theta_3)} = \frac{<<n(p.OA,3)>>(<<n(p.omega2,4)>>)\sin(<<n(60-d.theta3,3)>>^\circ)}{<<n(p.BE,3)>>\sin(<<n(d.theta4-d.theta3,3)>>^\circ)} = <<n(d.omega4,4)>>\ \text{rad/s (CCW)}$$
+Point velocities, using $j e^{j\theta} = -\sin\theta + j\cos\theta$:
+$$\mathbf V_A = l_2\omega_2(-\sin\theta_2 + j\cos\theta_2) = <<n(d.VA[0],4)>> + j\,<<n(d.VA[1],4)>>\ \text{m/s}$$
+$$\mathbf V_B = l_4\omega_4(-\sin\theta_4 + j\cos\theta_4) = <<n(d.VB[0],4)>> + j\,(<<n(d.VB[1],4)>>)\ \text{m/s}$$
+$$\mathbf V_C = \mathbf V_A + \overline{AC}\,\omega_3\,[-\sin(\theta_3-\beta) + j\cos(\theta_3-\beta)] = <<n(d.VC[0],4)>> + j\,<<n(d.VC[1],4)>>\ \text{m/s}$$
+Differentiating loop 2, $\mathbf V_C + j l_5\omega_5 e^{j\theta_5} = \dot S$ (real, since the slider moves horizontally):
+$$\text{Im:}\ V_{Cy} + l_5\omega_5\cos\theta_5 = 0\ \Rightarrow\ \omega_5 = \frac{-V_{Cy}}{l_5\cos\theta_5} = \frac{-<<n(d.VC[1],4)>>}{<<n(p.CD,3)>>\cos(<<n(d.theta5,3)>>^\circ)} = <<n(d.omega5,4)>>\ \text{rad/s (CW)}$$
+$$\text{Re:}\ V_D = \dot S = V_{Cx} - l_5\omega_5\sin\theta_5 = <<n(d.VD[0],4)>>\ \text{m/s (to the left)}$$
+Mass-centre velocities: $\mathbf V_{G3} = \mathbf V_A + j\tfrac{l_3}{2}\omega_3e^{j(\theta_3-\beta/2)} = <<n(d.VG3[0],4)>> + j\,<<n(d.VG3[1],4)>>$ m/s; $\mathbf V_{G5} = \mathbf V_C + j\tfrac{l_5}{2}\omega_5e^{j\theta_5} = <<n(d.VG5[0],4)>> + j\,<<n(d.VG5[1],4)>>$ m/s; $\mathbf V_{G2} = \tfrac12\mathbf V_A$, $\mathbf V_{G4} = \tfrac12\mathbf V_B$.
+
+## 5.3 Acceleration analysis
+
+Differentiating the velocity loop again:
+$$(j\alpha_2 - \omega_2^2)l_2e^{j\theta_2} + (j\alpha_3 - \omega_3^2)l_3e^{j\theta_3} - (j\alpha_4-\omega_4^2)l_4e^{j\theta_4} = 0\quad\Leftrightarrow\quad \mathbf a_A + \mathbf a_{B/A} = \mathbf a_B .$$
+Separating real and imaginary parts and using the Week 7 constants (with a = l₂, b = l₃, c = l₄):
+$$\begin{aligned}
+A &= c\sin\theta_4 = <<n(d.consts.A,5)>>, & B &= b\sin\theta_3 = <<n(d.consts.B,5)>>,\\
+D &= c\cos\theta_4 = <<n(d.consts.D,5)>>, & E &= b\cos\theta_3 = <<n(d.consts.E,5)>>,
+\end{aligned}$$
+$$C = a\alpha_2\sin\theta_2 + a\omega_2^2\cos\theta_2 + b\omega_3^2\cos\theta_3 - c\omega_4^2\cos\theta_4 = <<n(d.consts.C,3)>>,$$
+$$F = a\alpha_2\cos\theta_2 - a\omega_2^2\sin\theta_2 - b\omega_3^2\sin\theta_3 + c\omega_4^2\sin\theta_4 = <<n(d.consts.F,3)>>,$$
+$$\alpha_3 = \frac{CD - AF}{AE - BD} = <<n(d.alpha3,3)>>\ \text{rad/s}^2\ (\text{CCW}),$$
+$$\alpha_4 = \frac{CE - BF}{AE - BD} = <<n(d.alpha4,3)>>\ \text{rad/s}^2\ (\text{CCW}).$$
+Point accelerations:
+$$\mathbf a_A = (j\alpha_2-\omega_2^2)l_2e^{j\theta_2} = <<n(d.aA[0],3)>> + j(<<n(d.aA[1],3)>>)\ \text{m/s}^2$$
+$$\mathbf a_B = (j\alpha_4-\omega_4^2)l_4e^{j\theta_4} = <<n(d.aB[0],3)>> + j(<<n(d.aB[1],3)>>)\ \text{m/s}^2$$
+$$\mathbf a_C = \mathbf a_A + (j\alpha_3-\omega_3^2)\overline{AC}\,e^{j(\theta_3-\beta)} = <<n(d.aC[0],3)>> + j(<<n(d.aC[1],3)>>)\ \text{m/s}^2$$
+Differentiating loop 2 again, $\mathbf a_C + (j\alpha_5-\omega_5^2)l_5e^{j\theta_5} = \ddot S$:
+$$\alpha_5 = \frac{l_5\omega_5^2\sin\theta_5 - a_{Cy}}{l_5\cos\theta_5} = <<n(d.alpha5,3)>>\ \text{rad/s}^2\ (\text{CCW}),$$
+$$a_D = \ddot S = a_{Cx} - l_5\alpha_5\sin\theta_5 - l_5\omega_5^2\cos\theta_5 = <<n(d.aD[0],3)>>\ \text{m/s}^2 .$$
+Mass-centre accelerations, used in Section 6:
+
+| Link | $\mathbf a_G$ (m/s²) | $|a_G|$ (m/s²) | Direction (°) | α (rad/s²) |
+|---|---|---|---|---|
+| 2 | <<n(d.aG2[0],3)>> + j(<<n(d.aG2[1],3)>>) | <<n(mag(d.aG2),3)>> | <<n(ang(d.aG2),2)>> | 0 |
+| 3 | <<n(d.aG3[0],3)>> + j(<<n(d.aG3[1],3)>>) | <<n(mag(d.aG3),3)>> | <<n(ang(d.aG3),2)>> | <<n(d.alpha3,3)>> |
+| 4 | <<n(d.aG4[0],3)>> + j(<<n(d.aG4[1],3)>>) | <<n(mag(d.aG4),3)>> | <<n(ang(d.aG4),2)>> | <<n(d.alpha4,3)>> |
+| 5 | <<n(d.aG5[0],3)>> + j(<<n(d.aG5[1],3)>>) | <<n(mag(d.aG5),3)>> | <<n(ang(d.aG5),2)>> | <<n(d.alpha5,3)>> |
+| 6 | <<n(d.aG6[0],3)>> + j0 | <<n(mag(d.aG6),3)>> | <<n(ang(d.aG6),2)>> | 0 |
+
+Table: Table 13 – Mass-centre accelerations at θ₂ = 60° (analytical).
+
+## 5.4 Results and comparison
+
+| Link / point | Position | Velocity | Acceleration |
+|---|---|---|---|
+| 2 (A) | θ₂ = 60°, A = (<<n(d.pos_A[0]*1000,2)>>, <<n(d.pos_A[1]*1000,2)>>) mm | ω₂ = <<n(p.omega2,3)>> rad/s CCW; V_A = <<n(mag(d.VA),3)>> m/s ∠<<n(ang(d.VA),1)>>° | α₂ = 0; a_A = <<n(mag(d.aA),2)>> m/s² ∠<<n(ang(d.aA),1)>>° |
+| 3 (B, C) | θ₃ = <<n(d.theta3,3)>>°, C = (<<n(d.pos_C[0]*1000,2)>>, <<n(d.pos_C[1]*1000,2)>>) mm | ω₃ = <<n(d.omega3,4)>> rad/s; V_C = <<n(mag(d.VC),3)>> m/s ∠<<n(ang(d.VC),1)>>° | α₃ = <<n(d.alpha3,2)>> rad/s²; a_C = <<n(mag(d.aC),2)>> m/s² ∠<<n(ang(d.aC),1)>>° |
+| 4 (B) | θ₄ = <<n(d.theta4,3)>>°, B = (<<n(d.pos_B[0]*1000,2)>>, <<n(d.pos_B[1]*1000,2)>>) mm | ω₄ = <<n(d.omega4,4)>> rad/s; V_B = <<n(mag(d.VB),3)>> m/s ∠<<n(ang(d.VB),1)>>° | α₄ = <<n(d.alpha4,2)>> rad/s²; a_B = <<n(mag(d.aB),2)>> m/s² ∠<<n(ang(d.aB),1)>>° |
+| 5 (C→D) | θ₅ = <<n(d.theta5,3)>>° | ω₅ = <<n(d.omega5,4)>> rad/s | α₅ = <<n(d.alpha5,2)>> rad/s² |
+| 6 (D) | S = <<n(d.S*1000,2)>> mm, y = −<<n(p.H*1000,1)>> mm | V_D = <<n(d.VD[0],4)>> m/s | a_D = <<n(d.aD[0],3)>> m/s² |
+
+Table: Table 14 – Analytical results at θ₂ = 60° (signed angular quantities: + = CCW).
+
+::: {.small}
+| Pos. | θ₂ (°) | θ₃ (°) | θ₄ (°) | θ₅ (°) | S (mm) | ω₃ | ω₄ | ω₅ | V_D (m/s) | α₃ | α₄ | α₅ | a_D (m/s²) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+<% for r in R.analytical16 %>
+| << r.i >> | <<n(r.theta2,1)>> | <<n(r.theta3,3)>> | <<n(r.theta4,3)>> | <<n(r.theta5,3)>> | <<n(r.S*1000,2)>> | <<n(r.w3,3)>> | <<n(r.w4,3)>> | <<n(r.w5,3)>> | <<n(r.VD,3)>> | <<n(r.al3,1)>> | <<n(r.al4,1)>> | <<n(r.al5,1)>> | <<n(r.aD,1)>> |
+<% endfor %>
+
+Table: Table 15 – Analytical solution at the 16 positions (ω in rad/s, α in rad/s²; + = CCW, V_D and a_D + = to the right).
+:::
+
+::: {.small}
+| Quantity | Unit | Graphical | IC method | Analytical | Computational | Graph. vs anal. | IC vs anal. |
+|---|---|---|---|---|---|---|---|
+<% for r in cmp %>
+| <<r.name>> | <<r.unit>> | <<n(r.g,3)>> | << n(r.ic,3) if r.ic is not none else "–" >> | <<n(r.an,3)>> | <<n(r.cp,3)>> | <<n(r.dg,2)>> % | << (n(r.dic,2) ~ " %") if r.dic is not none else "–" >> |
+<% endfor %>
+
+Table: Table 16 – Comparison of all methods at θ₂ = 60° (magnitudes). The computational model differs from the analytical solution by less than 10⁻⁷ in every quantity (Section 7).
+:::
+
+**Correlation.** The graphical results agree with the analytical ones to within <<n(max_dg_vel,2)>> % for velocities and <<n(max_dg_acc,2)>> % for accelerations. The remaining differences come only from reading the drawings to ±0.5 mm and ±0.5°. Short vectors suffer most: V_D/C is just 20 mm long, so a 0.25 mm reading error is already 1.2 % of it, which is why ω₅ shows the largest graphical error. Choosing a larger scale for short vectors, or computing them analytically, improves the result. The analytical method is exact for the model, and its numbers were also verified against numerical differentiation of the position solution.
+
+# 6. Dynamic Force Analysis — Matrix Method (θ₂ = 60°) {#sec6}
+
+**Assumptions.** Rigid links; frictionless pins; constant crank speed (α₂ = 0); no external load on the slider; gravity neglected (at θ₂ = 60° the inertia forces are <<n(gmin,0)>>–<<n(gmax,0)>> times the link weights; the effect of gravity is quantified in Section 7). The slider guide is frictionless in the baseline solution. Coulomb friction μ = 0.3, as in the lecture help example, is solved as a variant.
+
+**Notation (Week 9).** $\mathbf F_{ij}$ is the force of link *i* on link *j*, and $\mathbf F_{ji} = -\mathbf F_{ij}$. $\mathbf R_{ij}$ is the vector from the mass centre $G_j$ to the joint where $\mathbf F_{ij}$ acts. The cross product of two planar vectors is $\mathbf R\times\mathbf F = R_xF_y - R_yF_x$.
+
+![Figure 9 – Free-body diagrams of links 2–6 at θ₂ = 60°, showing the solved force directions (not to force scale).](figures/fig9_fbd.<<figext>>){width=175mm}
+
+| Vector | x (m) | y (m) | Vector | x (m) | y (m) |
+|---|---|---|---|---|---|
+| $R_{12}$ (G₂→O) | <<n(s6.R.R12[0],5)>> | <<n(s6.R.R12[1],5)>> | $R_{32}$ (G₂→A) | <<n(s6.R.R32[0],5)>> | <<n(s6.R.R32[1],5)>> |
+| $R_{23}$ (G₃→A) | <<n(s6.R.R23[0],5)>> | <<n(s6.R.R23[1],5)>> | $R_{43}$ (G₃→B) | <<n(s6.R.R43[0],5)>> | <<n(s6.R.R43[1],5)>> |
+| $R_{53}$ (G₃→C) | <<n(s6.R.R53[0],5)>> | <<n(s6.R.R53[1],5)>> | $R_{34}$ (G₄→B) | <<n(s6.R.R34[0],5)>> | <<n(s6.R.R34[1],5)>> |
+| $R_{14}$ (G₄→E) | <<n(s6.R.R14[0],5)>> | <<n(s6.R.R14[1],5)>> | $R_{35}$ (G₅→C) | <<n(s6.R.R35[0],5)>> | <<n(s6.R.R35[1],5)>> |
+| $R_{65}$ (G₅→D) | <<n(s6.R.R65[0],5)>> | <<n(s6.R.R65[1],5)>> | | | |
+
+Table: Table 17 – Position vectors from each mass centre to its joints at θ₂ = 60°.
+
+**Equations of motion** (14 equations, 14 unknowns $F_{12x}, F_{12y}, F_{32x}, F_{32y}, F_{43x}, F_{43y}, F_{53x}, F_{53y}, F_{14x}, F_{14y}, F_{65x}, F_{65y}, F_{16y}, T_{12}$):
+
+$$\begin{aligned}
+&\textbf{Link 2:} \\
+&(1)\quad F_{12x} + F_{32x} = m_2a_{G2x} \qquad\qquad (2)\quad F_{12y} + F_{32y} = m_2a_{G2y}\\
+&(3)\quad T_{12} + (R_{12x}F_{12y} - R_{12y}F_{12x}) + (R_{32x}F_{32y} - R_{32y}F_{32x}) = I_{G2}\alpha_2\\[4pt]
+&\textbf{Link 3:} \quad (\mathbf F_{23} = -\mathbf F_{32})\\
+&(4)\quad -F_{32x} + F_{43x} + F_{53x} = m_3a_{G3x} \qquad (5)\quad -F_{32y} + F_{43y} + F_{53y} = m_3a_{G3y}\\
+&(6)\quad -(R_{23x}F_{32y} - R_{23y}F_{32x}) + (R_{43x}F_{43y} - R_{43y}F_{43x}) + (R_{53x}F_{53y} - R_{53y}F_{53x}) = I_{G3}\alpha_3\\[4pt]
+&\textbf{Link 4:} \quad (\mathbf F_{34} = -\mathbf F_{43})\\
+&(7)\quad -F_{43x} + F_{14x} = m_4a_{G4x} \qquad\qquad (8)\quad -F_{43y} + F_{14y} = m_4a_{G4y}\\
+&(9)\quad -(R_{34x}F_{43y} - R_{34y}F_{43x}) + (R_{14x}F_{14y} - R_{14y}F_{14x}) = I_{G4}\alpha_4\\[4pt]
+&\textbf{Link 5:} \quad (\mathbf F_{35} = -\mathbf F_{53})\\
+&(10)\quad -F_{53x} + F_{65x} = m_5a_{G5x} \qquad\qquad (11)\quad -F_{53y} + F_{65y} = m_5a_{G5y}\\
+&(12)\quad -(R_{35x}F_{53y} - R_{35y}F_{53x}) + (R_{65x}F_{65y} - R_{65y}F_{65x}) = I_{G5}\alpha_5\\[4pt]
+&\textbf{Link 6:} \quad (\mathbf F_{56} = -\mathbf F_{65},\ F_{16x} = \mu' F_{16y})\\
+&(13)\quad -F_{65x} + \mu' F_{16y} = m_6a_{G6x} \qquad\qquad (14)\quad -F_{65y} + F_{16y} = m_6a_{G6y} = 0
+\end{aligned}$$
+
+The slider's moment equation is not needed: its mass centre is at the pin D and it cannot rotate, so the guide simply supplies whatever couple is required (zero here).
+
+**Matrix form $[A]\{B\} = \{C\}$** with the numbers at θ₂ = 60° (μ′ = 0):
+
+::: {.matrix}
+| Eq. | <% for u in unknowns %><<u>> | <% endfor %>{C} |
+|---|<% for u in unknowns %>---|<% endfor %>---|
+<% for i in range(14) %>
+| (<<i+1>>) | <% for j in range(14) %><<fm(Amat[i][j])>> | <% endfor %><<n(rhs[i],3)>> |
+<% endfor %>
+
+Table: Table 18 – The 14 × 14 coefficient matrix [A] (geometry) and the right-hand side {C} (inertia terms: $m a_G$ in N, $I\alpha$ in N·m).
+:::
+
+**Solution** ($\{B\} = [A]^{-1}\{C\}$, solved with NumPy `linalg.solve`; MATLAB `A\C`, Excel `MMULT(MINVERSE(A),C)` or any matrix solver gives the same):
+
+| Joint | Force | x (N) | y (N) | Magnitude (N) | Direction (°) | Magnitude with μ = 0.3 (N) |
+|---|---|---|---|---|---|---|
+<% for q in pins %>
+| <<q.joint>> | $<<q.key[0]>>_{<<q.key[1:]>>}$ | <<n(q.x,2)>> | <<n(q.y,2)>> | <<n(q.m,2)>> | <<n(q.ang,2)>> | <<n(q.m3,2)>> |
+<% endfor %>
+| Slider guide | $F_{16}$ (side load) | <<n(F0.F16x,2)>> | <<n(F0.F16y,2)>> | <<n(abs(F0.F16y),2)>> | <<n(270 if F0.F16y < 0 else 90,0)>> | <<n((F3.F16x**2 + F3.F16y**2)**0.5,2)>> |
+| Crank | Driving torque $T_{12}$ | | | **<<n(F0.T12,3)>> N·m** (CCW) | | <<n(F3.T12,3)>> N·m |
+
+Table: Table 19 – Joint forces and driving torque at θ₂ = 60° (forces are those acting on the second-named link, F_ij = force of i on j).
+
+**Interpretation.** The ground pushes the slider *downwards* (F₁₆y = <<n(F0.F16y,1)>> N): the connecting rod pulls the slider up against the top face of the guide. The crank bearing O carries the largest load: $\mathbf F_{12} = m_2\mathbf a_{G2} - \mathbf F_{32}$, i.e. it reacts the <<n(pins[1].m,0)>> N force coming from the coupler at A plus the crank's own inertia force (<<n(p.masses.m2*mag(d.aG2),0)>> N).
+
+**Checks.**
+
+- *Power (virtual work) balance:* $T_{12}\,\omega_2 = \sum (m_i\mathbf a_{Gi}\cdot\mathbf V_{Gi} + I_i\alpha_i\omega_i)$ gives T₁₂ = <<n(s6.checks.T12_power,4)>> N·m, identical to the matrix solution.
+- *Sum of ground reactions:* $\mathbf F_{12} + \mathbf F_{14} + \mathbf F_{16} = \sum m_i\mathbf a_{Gi}$ is satisfied to round-off.
+- *Independent solver:* the multibody model of Section 7 returns the same pin forces from its Lagrange multipliers (difference < 10⁻⁷ N).
+- *Lecture cross-check:* the Week 9 "Help for 6-bar linkage" slide uses the same OA = 0.18 m and n₂ = 440 rpm. Its link-2 numbers, $a_{G2}$ = 191.08 m/s² at 240°, $R_{12}$ = (−0.045, −0.078) m and $R_{32}$ = (0.045, 0.078) m, are identical to Tables 13 and 17, and its equation (3) is the same as row (3) of Table 18.
+- *Sensitivity to the G₃ location:* placing G₃ at the triangle centroid (Table 3 note) instead of on the bisector changes $a_{G3}$ by <<n(g3s.aG3,1)>> %, T₁₂ by <<n(g3s.T12,1)>> %, |F₁₂| by <<n(g3s.F12,1)>> %, |F₃₂| by <<n(g3s.F32,1)>> % and |F₄₃| by <<n(g3s.F43,1)>> %. Forces at C, D and the slider are unchanged, because links 5 and 6 do not see link 3's mass distribution.
+
+**With Coulomb friction at the slider (μ = 0.3).** Friction opposes sliding: $F_{16x} = -\mu\,|F_{16y}|\,\operatorname{sign}(V_D)$. The matrix needs the linear form $F_{16x} = \mu' F_{16y}$, so $\mu' = -\mu\,\operatorname{sign}(V_D)\operatorname{sign}(F_{16y})$, found by solving once with μ′ = 0 to get the signs. Here V_D < 0 and F₁₆y < 0, so μ′ = <<n(F3.mu_eff,1)>> and F₁₆x = +<<n(F3.F16x,2)>> N (pushing the slider to the right, against its leftward motion). The normal force rises to <<n(abs(F3.F16y),1)>> N and the driving torque to <<n(F3.T12,2)>> N·m. The extra <<n(F3.T12-F0.T12,2)>> N·m equals the friction power $|F_{16x}V_D|/\omega_2$. The lecture help example writes $F_{16x} = 0.3F_{16y}$ with a fixed + sign. That is only correct for one combination of slider direction and contact face, so check the sign at every position.
+
+# 7. Computational Model (Working-Model-equivalent Simulation) {#sec7}
+
+**Model.** Working Model 2D (WM) is a Windows program that was not available in the environment where this solution was prepared. The rubric accepts "Working Model / MATLAB Simulink / Excel or any other software", so the same model was built from first principles as a planar multibody simulation in Python (`analysis/simulation.py`), exactly the way WM represents it:
+
+- five rigid bodies (links 2–6), each described by the (x, y, φ) of its mass centre → 15 coordinates, with the masses and moments of inertia of Table 3;
+- six pin joints (O, A, B, E, C, D), each 2 constraint equations; one keyed-slot joint (slider on y = −H, no rotation), 2 equations; one velocity motor at O (φ₂ = ω₂t), 1 equation → 15 constraints;
+- equations of motion $M\ddot q + \Phi_q^T\lambda = Q$ with Baumgarte constraint stabilisation, integrated in time with an 8th-order Runge–Kutta solver (DOP853, tolerance 10⁻¹¹) from a roughly sketched initial configuration that the program "assembles" by Newton–Raphson, as WM does;
+- joint forces, the slot reaction (side load) and the motor torque taken from the Lagrange multipliers, the equivalent of WM force meters.
+
+This model does **not** use the closed-form loop equations of Section 5, so it is a genuinely independent check.
+
+![Figure 10 – Computed paths (WM "track" traces) of joints A, B, C, D and mass centres G₂–G₅ over one revolution, with the mechanism at θ₂ = 60°.](figures/fig10_sim_paths.<<figext>>){width=168mm}
+
+![Figure 11 – Angular position, velocity and acceleration of links 3, 4, 5 over one revolution (lines: computational; circles: analytical at the 16 positions; dashed line: θ₂ = 60°).](figures/fig11_sim_angular.<<figext>>){width=168mm}
+
+![Figure 12 – Slider position, joint velocities and accelerations over one revolution.](figures/fig12_sim_linear.<<figext>>){width=168mm}
+
+![Figure 13 – Pin-force magnitudes at O, A, B, E, C and D over one revolution (μ = 0, no gravity).](figures/fig13_sim_pin_forces.<<figext>>){width=168mm}
+
+![Figure 14 – Slider side load F₁₆y and driving torque T₁₂ over one revolution; dotted: with gravity (WM default); dashed: with μ = 0.3 slider friction.](figures/fig14_sim_torque_sideload.<<figext>>){width=168mm}
+
+::: {.small}
+| Pos. | θ₂ (°) | θ₃ (°) | θ₄ (°) | θ₅ (°) | S (mm) | ω₃ | ω₄ | ω₅ | V_D (m/s) | α₃ | α₄ | α₅ | a_D (m/s²) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+<% for r in s7.rows16 %>
+| <<r.pos>> | <<n(r.theta2,1)>> | <<n(r.theta3,3)>> | <<n(r.theta4,3)>> | <<n(r.theta5,3)>> | <<n(r.S_mm,2)>> | <<n(r.w3,3)>> | <<n(r.w4,3)>> | <<n(r.w5,3)>> | <<n(r.VD,3)>> | <<n(r.al3,1)>> | <<n(r.al4,1)>> | <<n(r.al5,1)>> | <<n(r.aD,1)>> |
+<% endfor %>
+
+Table: Table 20 – Computational kinematics at the 16 positions (ω in rad/s, α in rad/s², + = CCW; identical to Table 15 to all printed digits).
+:::
+
+::: {.small}
+| Pos. | θ₂ (°) | T₁₂ (N·m) | F₁₆y side load (N) | pin O F₁₂ (N) | pin A F₃₂ (N) | pin B F₄₃ (N) | pin E F₁₄ (N) | pin C F₅₃ (N) | pin D F₆₅ (N) |
+|---|---|---|---|---|---|---|---|---|---|
+<% for r in s7.rows16 %>
+| <<r.pos>> | <<n(r.theta2,1)>> | <<n(r.T12,2)>> | <<n(r.F16y,1)>> | <<n(r.F12,1)>> | <<n(r.F32,1)>> | <<n(r.F43,1)>> | <<n(r.F14,1)>> | <<n(r.F53,1)>> | <<n(r.F65,1)>> |
+<% endfor %>
+
+Table: Table 20b – Computational driving torque, slider side load and pin-force magnitudes at the 16 positions (μ = 0, no gravity).
+:::
+
+**Extreme values over one revolution.**
+
+| Quantity | Value | at θ₂ |
+|---|---|---|
+| Driving torque, maximum / minimum | +<<n(s7.summary.T12_max,1)>> / <<n(s7.summary.T12_min,1)>> N·m | <<n(s7.summary.T12_max_at,1)>>° / <<n(s7.summary.T12_min_at,1)>>° |
+| Driving torque, mean / RMS | <<n(s7.summary.T12_mean,3)>> / <<n(s7.summary.T12_rms,1)>> N·m | – |
+| Slider side load, largest magnitude | <<n(s7.summary.F16y_absmax,1)>> N | <<n(s7.summary.F16y_absmax_at,1)>>° |
+<% for k, lab in [("F12","Pin O (crank bearing)"),("F32","Pin A"),("F43","Pin B"),("F14","Pin E (rocker bearing)"),("F53","Pin C"),("F65","Pin D")] %>
+| <<lab>> force, maximum | <<n(s7.summary.pin_max[k],0)>> N | <<n(s7.summary.pin_max_at[k],1)>>° |
+<% endfor %>
+
+Table: Table 21 – Peak loads over one revolution (computational model).
+
+**How do the results compare with the analytical and graphical approaches?**
+
+| Quantity | max \|computational − analytical\| over the revolution | Largest value |
+|---|---|---|
+<% for k, v in s7.compare.items() %>
+| <<k>> | <<"%.1e" % v[0]>> | <<n(v[1],3)>> |
+<% endfor %>
+
+Table: Table 22 – Agreement between the independent computational model and the analytical solution at all 721 time steps (0.5° of crank rotation).
+
+- **Computational vs analytical:** identical to better than 10⁻⁷ in every kinematic and dynamic quantity (Table 22). Two completely different formulations agreeing this closely confirms both. The mean driving torque over a cycle is <<n(s7.summary.T12_mean,4)>> N·m, i.e. zero. This is correct physics: with no load and no friction, the energy the motor puts in during part of the cycle is returned during the rest.
+- **Computational vs graphical:** within the drawing accuracy (Table 16), ≤ <<n(max_dg_vel,1)>> % for velocities and ≤ <<n(max_dg_acc,1)>> % for accelerations.
+- **Gravity.** Working Model has gravity switched on by default. Including it changes T₁₂ by at most <<n(s7.summary.gravity_T12_maxdiff,2)>> N·m and the side load by at most <<n(s7.summary.gravity_F16y_maxdiff,1)>> N (at 60°: T₁₂ = <<n(s7.summary.at60.T12_gravity,2)>> N·m, F₁₆y = <<n(s7.summary.at60.F16y_gravity,1)>> N). Switch gravity **off** (World ▸ Gravity ▸ None) when comparing with the matrix method.
+- **Friction.** With μ = 0.3 the torque peak rises to <<n(s7.summary.mu03_T12_max,1)>> N·m and the mean torque becomes <<n(s7.summary.mu03_T12_mean,2)>> N·m, the friction loss. The side load jumps when the slider reverses (θ₂ = <<n(th_DR,1)>>° and <<n(th_DL,1)>>°), because the friction force changes direction.
+- **Expected WM differences.** A real WM run typically differs from the analytical values by 0.1–1 %. The reasons are its integrator and animation step, meter rounding, gravity being left on, or measuring at a body's mass centre instead of at the joint. The FAQ notes that simulated results about 50 % lower than the analytical ones are the typical symptom of measuring at the COM. Put point elements on the joints before measuring.
+
+## 7.1 How to build this model in Working Model 2D
+
+1. **Set up:** View ▸ Workspace: tick Grid Lines and X,Y Axes. View ▸ Numbers and Units: SI (degrees); More Choices ▸ Rot. Velocity = rev/min (to show rpm). World ▸ Gravity: None (for comparison with Section 6).
+2. **Draw the bodies at θ₂ = 60°** using the coordinates below (origin at O). Draw links 2, 4 and 5 as thin rectangles (e.g. 10 mm wide) between their joint points, link 3 as a polygon A-B-C, and the slider as a small rectangle at D. The ground parts are anchored (anchor tool): pivot O, pivot E and the slider track at y = −H.
+3. **Mass properties (Window ▸ Properties):** enter the masses and moments of inertia of Table 3. Link 3's centre of mass must be at G₃, not at the polygon centroid: in Window ▸ Geometry set the COM offset. At the drawn position, G₃ − centroid = (<<n(wm.at60.G3_minus_centroid[0]*1000,2)>>, <<n(wm.at60.G3_minus_centroid[1]*1000,2)>>) mm in global axes (convert to the body's own axes if the polygon was drawn rotated).
+4. **Joints:** pin joints at O (link 2–ground), A (2–3), B (3–4), E (4–ground), C (3–5) and D (5–6); a keyed slot joint between the slider and the horizontal track. Select all links ▸ Object ▸ Do Not Collide (FAQ).
+5. **Motor:** at O, type Velocity, <<n(p.n2_rpm,0)>> rpm (positive = anticlockwise).
+6. **Frames:** World ▸ Accuracy ▸ Animation step = T/16 = 60/(<<n(p.n2_rpm,0)>> × 16) = <<n(wm.frame16,7)>> s. The FAQ notes that WM rounds this box to 3 decimals: here 0.009 s, which is <<n(p.omega2*0.009*180/math.pi,2)>>° per frame instead of 22.5°, so 16 frames overshoot one revolution by <<n(16*p.omega2*0.009*180/math.pi - 360,0)>>°. Treat the frames as a quick visual check only, and take the exact 16 positions from a crank-angle meter, or from Tables 4 and 20. World ▸ Pause Control: `frame() = 16`. Without rounding, frame k (k = 0 … 15) of a model drawn at 60° would be position k + 1. For the FAQ's six-frame method (model drawn at θ₂ = 0°), use T/6 = <<n(wm.frame6,6)>> s; WM rounds it to 0.023 s, so the first frame lands at <<n(p.omega2*0.023*180/math.pi,1)>>° rather than exactly 60°.
+7. **Meters:** put Point elements (snapped, "X") on A, B, C, D and on each mass centre. Then use Measure ▸ Position / Velocity / Acceleration on the points, Measure ▸ Force on the pins and slot, and Measure ▸ Torque on the motor. Joint paths: select a point ▸ Appearance ▸ Track centre of mass.
+
+::: {.small}
+| Point | x at θ₂ = 60° (mm) | y at θ₂ = 60° (mm) | x at θ₂ = 0° (mm) | y at θ₂ = 0° (mm) |
+|---|---|---|---|---|
+<% for k in ["O","A","B","C","D","E","G2","G3","G4","G5"] %>
+| <<k>> | <<n(wm.at60.points[k][0]*1000,2)>> | <<n(wm.at60.points[k][1]*1000,2)>> | <<n(wm.at0.points[k][0]*1000,2)>> | <<n(wm.at0.points[k][1]*1000,2)>> |
+<% endfor %>
+| angles θ₃, θ₄, θ₅ | <<n(wm.at60.angles.theta3,3)>>°, <<n(wm.at60.angles.theta4,3)>>°, <<n(wm.at60.angles.theta5,3)>>° | | <<n(wm.at0.angles.theta3,3)>>°, <<n(wm.at0.angles.theta4,3)>>°, <<n(wm.at0.angles.theta5,3)>>° | |
+
+Table: Table 23 – Working Model build coordinates (origin at O, x right, y up).
+:::
+
+# 8. Shaking Force, Shaking Moment and Balancing {#sec8}
+
+## 8.1 Shaking force and moment at θ₂ = 60° (course template)
+
+The forces of the moving links on the frame are $\mathbf F_{21} = -\mathbf F_{12}$, $\mathbf F_{41} = -\mathbf F_{14}$ and $\mathbf F_{61} = -\mathbf F_{16}$ (Table 19):
+
+| | x (N) | y (N) |
+|---|---|---|
+| $F_{21}$ (at O) | <<n(s8.at60.F21[0],2)>> | <<n(s8.at60.F21[1],2)>> |
+| $F_{41}$ (at E) | <<n(s8.at60.F41[0],2)>> | <<n(s8.at60.F41[1],2)>> |
+| $F_{61}$ (at D, along the guide) | <<n(s8.at60.F61[0],2)>> | <<n(s8.at60.F61[1],2)>> |
+| **Sum = shaking force $F_s$** | **<<n(s8.at60.Fsx,2)>>** | **<<n(s8.at60.Fsy,2)>>** |
+
+Table: Table 24 – Forces on the frame at θ₂ = 60°.
+
+$$F_s = \sqrt{\textstyle\sum F_x^2 + \sum F_y^2} = \sqrt{<<n(s8.at60.Fsx,1)>>^2 + <<n(s8.at60.Fsy,1)>>^2} = <<n(s8.at60.Fs,1)>>\ \text{N},$$
+$$\phi = \tan^{-1}\frac{<<n(s8.at60.Fsy,1)>>}{<<n(s8.at60.Fsx,1)>>} = <<n(s8.at60.Fs_angle,2)>>^\circ .$$
+The shaking (reaction) torque is $T_s = T_{21} = -T_{12} = <<n(s8.at60.T21,2)>>$ N·m, and the shaking moment about O is
+$$M_s = T_{21} + \mathbf R_E\times\mathbf F_{41} + \mathbf R_D\times\mathbf F_{61} = <<n(s8.at60.T21,2)>> + <<n(s8.at60.RExF41,2)>> + <<n(s8.at60.RDxF61,2)>> = <<n(s8.at60.Ms,2)>>\ \text{N}\cdot\text{m (CCW)}.$$
+Check: $\mathbf F_s = -\sum m_i\mathbf a_{Gi}$ and $M_s = -\sum(\mathbf r_{Gi}\times m_i\mathbf a_{Gi} + I_i\alpha_i)$ give the same values. Friction at the slider does not change $\mathbf F_s$ or $M_s$, only how the load is shared between the bearings.
+
+## 8.2 Over one revolution
+
+![Figure 15 – Shaking force: polar diagram of Fₛ (top; crank angles marked on the unbalanced curve) and its magnitude over one revolution (bottom), unbalanced and after balancing.](figures/fig15_shaking_force.<<figext>>){width=170mm}
+
+![Figure 16 – Shaking moment about O and driving torque over one revolution, before and after balancing.](figures/fig16_shaking_moment_torque.<<figext>>){width=168mm}
+
+Unbalanced, the shaking force reaches <<n(s8.stats.unbalanced.Fs_max,0)>> N (RMS <<n(s8.stats.unbalanced.Fs_rms,0)>> N). It is dominated by its horizontal component (up to <<n(s8.stats.unbalanced.Fsx_max,0)>> N), which comes from the large horizontal accelerations of links 3, 5 and the slider. The shaking moment reaches <<n(s8.stats.unbalanced.Ms_max,0)>> N·m.
+
+## 8.3 Analytical balancing strategy
+
+A mechanism exerts no shaking force when the **total centre of mass of its moving links is stationary**, because $\mathbf F_s = -M_{tot}\,\mathbf a_{cm}$. The strategy below makes this as nearly true as possible using counterweights on the two links that are pivoted to the frame (crank 2 and rocker 4), since they are the only places where added mass can be supported by an existing bearing.
+
+**Step 1 – Model link 5 by two point masses.** Replace link 5 by $m_5/2 = <<n(p.masses.m5/2,2)>>$ kg at C and $m_5/2$ at D. This has the same mass and centre of mass, so it gives exactly the same shaking force. Link 3 then carries $m_3' = m_3 + m_5/2 = <<n(s8.berkof.m3p,2)>>$ kg with its mass centre, in a frame fixed to link 3 (origin A, x along AB), at
+$$g_3 = \frac{m_3\,\tfrac{l_3}{2}e^{-j\beta/2} + \tfrac{m_5}{2}\,\overline{AC}\,e^{-j\beta}}{m_3'} = <<n(s8.berkof.g3[0],4)>> <<"+" if s8.berkof.g3[1] >= 0 else "−">> j\,<<n(abs(s8.berkof.g3[1]),4)>>\ \text{m}.$$
+The reciprocating mass at D is $m_{rec} = m_6 + m_5/2 = <<n(s8.m_rec,2)>>$ kg.
+
+**Step 2 – Berkof–Lowen balance of the four-bar O-A-B-E.** Write the total mass moment of links 2, 3′ and 4 using body-fixed complex vectors ($P_2$ for link 2 about O, $P_4$ for link 4 about E):
+$$M\mathbf r_{cm} = P_2e^{j\theta_2} + m_3'\left(l_2e^{j\theta_2} + g_3e^{j\theta_3}\right) + m_4\mathbf R_E + P_4e^{j\theta_4}.$$
+Eliminate $e^{j\theta_3}$ with loop 1, $e^{j\theta_3} = (l_1e^{j\theta_1} + l_4e^{j\theta_4} - l_2e^{j\theta_2})/l_3$:
+$$M\mathbf r_{cm} = \Big[P_2 + m_3'l_2\big(1 - \tfrac{g_3}{l_3}\big)\Big]e^{j\theta_2} + \Big[P_4 + m_3'\tfrac{g_3}{l_3}l_4\Big]e^{j\theta_4} + \text{constant}.$$
+The centre of mass is stationary for every θ₂ if both brackets vanish:
+$$P_{2,req} = -m_3'l_2\Big(1-\frac{g_3}{l_3}\Big) = <<n(s8.berkof.M2_req[0],4)>> <<"+" if s8.berkof.M2_req[1] >= 0 else "−">> j\,<<n(abs(s8.berkof.M2_req[1]),4)>>\ \text{kg}\cdot\text{m},$$
+$$P_{4,req} = -m_3'\frac{g_3\,l_4}{l_3} = <<n(s8.berkof.M4_req[0],4)>> <<"+" if s8.berkof.M4_req[1] >= 0 else "−">> j\,<<n(abs(s8.berkof.M4_req[1]),4)>>\ \text{kg}\cdot\text{m}.$$
+Subtracting what the links already have ($m_2l_2/2 = <<n(p.masses.m2*p.OA/2,3)>>$ kg·m and $m_4l_4/2 = <<n(p.masses.m4*p.BE/2,3)>>$ kg·m along the links) gives the counterweight mass moments
+$$m_{c2}\,\mathbf u_2 = <<n(s8.berkof.P2[0],4)>> <<"+" if s8.berkof.P2[1] >= 0 else "−">> j\,<<n(abs(s8.berkof.P2[1]),4)>>\ \text{kg}\cdot\text{m}\ (|\,|= <<n((s8.berkof.P2[0]**2+s8.berkof.P2[1]**2)**0.5,3)>>),$$
+$$m_{c4}\,\mathbf u_4 = <<n(s8.berkof.P4[0],4)>> <<"+" if s8.berkof.P4[1] >= 0 else "−">> j\,<<n(abs(s8.berkof.P4[1]),4)>>\ \text{kg}\cdot\text{m}\ (|\,|= <<n((s8.berkof.P4[0]**2+s8.berkof.P4[1]**2)**0.5,3)>>).$$
+In practice: a <<n(s8.designs.berkof_lowen.m2c,2)>> kg mass at 120 mm on the crank, almost opposite A (angle <<n(ang(s8.designs.berkof_lowen.u2),1)>>° from OA), and a <<n(s8.designs.berkof_lowen.m4c,2)>> kg mass at 120 mm on an extension of the rocker beyond E (angle <<n(ang(s8.designs.berkof_lowen.u4),1)>>° from EB). A larger radius reduces the masses in proportion (m·r is what matters).
+
+**Step 3 – The residual.** After Step 2, $\mathbf F_s = -m_{rec}\,a_D$, which is purely horizontal (verified numerically to 10⁻¹²). It cannot be cancelled by a rotating counterweight, which produces a force of constant magnitude rotating at crank speed. Such a counterweight can only remove the forward-rotating half of the first harmonic of $a_D$, and it trades horizontal for vertical force. The best amount is found by least squares (Step 4).
+
+**Step 4 – Optimum.** Because the counterweights do not change the kinematics, their inertia forces are *linear* in the complex mass moments: $\mathbf F_s(\theta) = \mathbf F_{s0}(\theta) + P_2\,\omega_2^2e^{j\theta_2} - P_4\,(j\alpha_4-\omega_4^2)e^{j\theta_4}$. Minimising $\sum_\theta|\mathbf F_s|^2$ over one revolution is therefore a linear least-squares problem for P₂ and P₄, with optimum $P_2 = <<n(s8.optimal.P2[0],4)>> <<"+" if s8.optimal.P2[1] >= 0 else "−">> j\,<<n(abs(s8.optimal.P2[1]),4)>>$ and $P_4 = <<n(s8.optimal.P4[0],4)>> <<"+" if s8.optimal.P4[1] >= 0 else "−">> j\,<<n(abs(s8.optimal.P4[1]),4)>>$ kg·m.
+
+::: {.small}
+| Strategy | Counterweights (at 120 mm) | RMS $F_s$ (N) | Peak $F_s$ (N) | Peak $M_s$ (N·m) | Torque range (N·m) |
+|---|---|---|---|---|---|
+<% for name, stt, des in bal_rows %>
+| <<name>> | << ("crank %s kg, rocker %s kg" % (n(des.m2c,2), n(des.m4c,2))) if des else "–" >> | <<n(stt.Fs_rms,0)>> | <<n(stt.Fs_max,0)>> | <<n(stt.Ms_max,0)>> | <<n(stt.T_min,0)>> … +<<n(stt.T_max,0)>> |
+<% endfor %>
+
+Table: Table 25 – Comparison of balancing strategies over one revolution.
+:::
+
+## 8.4 Discussion
+
+- The **Berkof–Lowen** counterweights remove all of the shaking force except the slider's reciprocating part. The RMS falls by <<n(-pct(s8.stats.berkof_lowen.Fs_rms, s8.stats.unbalanced.Fs_rms),0)>> % and the peak by <<n(-pct(s8.stats.berkof_lowen.Fs_max, s8.stats.unbalanced.Fs_max),0)>> %, and the remaining force is purely horizontal, which is easier to absorb in the machine frame. The shaking moment also falls, by <<n(-pct(s8.stats.berkof_lowen.Ms_max, s8.stats.unbalanced.Ms_max),0)>> % in peak.
+- The **least-squares optimum** cuts the RMS shaking force by <<n(-pct(s8.stats.optimal_lsq.Fs_rms, s8.stats.unbalanced.Fs_rms),0)>> %. It does so by over-balancing the crank and rocker slightly, so that part of the reciprocating force is cancelled at the cost of a small vertical component.
+- **Costs.** About <<n(s8.designs.optimal_lsq.m2c + s8.designs.optimal_lsq.m4c,1)>> kg of counterweights is added to a mechanism whose moving links weigh <<n(p.masses.m2+p.masses.m3+p.masses.m4+p.masses.m5+p.masses.m6,1)>> kg. The driving-torque range grows from ±<<n(s8.stats.unbalanced.T_max,0)>> to <<n(s8.stats.optimal_lsq.T_min,0)>> … +<<n(s8.stats.optimal_lsq.T_max,0)>> N·m, and the bearings at O and E carry the counterweight inertia. A flywheel on the crank shaft is recommended to keep the speed constant, and the bearings should be sized for the larger loads.
+- **Complete balancing** would also require cancelling the reciprocating force. One option is a mirror-image second slider driven 180° out of phase from the same crank (an opposed arrangement). Another is a dedicated balancing slider. A counter-rotating inertia geared to the crank can remove the shaking moment. These add complexity, and are worthwhile only if the residual of about <<n(s8.stats.optimal_lsq.Fs_max,0)>> N peak is still too large for the application.
+- **Recommended strategy:** fit Berkof–Lowen counterweights on links 2 and 4, then trim the crank counterweight towards the least-squares value, plus a flywheel. This removes most of the shaking force with two simple parts and keeps the remaining force horizontal.
+
+# Conclusions {#conclusions}
+
+1. The selected dimensions (AB = <<n(p.AB*1000,0)>> mm, BE = <<n(p.BE*1000,0)>> mm) satisfy the course selection rules and Grashof's criterion. The mechanism is a crank–rocker driving a slider through a <<n(stroke*1000,1)>> mm stroke with a quick-return ratio of <<n(Q,2)>>, and the transmission angle never falls below <<n(R.transmission.fourbar_min,1)>>°.
+2. At θ₂ = 60° the slider moves left at <<n(mag(d.VD),3)>> m/s and is still speeding up (a_D = <<n(mag(d.aD),1)>> m/s² to the left), and the links' angular velocities are ω₃ = <<n(abs(d.omega3),2)>> rad/s CW, ω₄ = <<n(abs(d.omega4),2)>> rad/s CCW and ω₅ = <<n(abs(d.omega5),2)>> rad/s CW. The angular accelerations are α₃ = <<n(d.alpha3,1)>>, α₄ = <<n(d.alpha4,1)>> and α₅ = <<n(d.alpha5,1)>> rad/s², all CCW.
+3. The four independent methods (graphical polygons, instantaneous centres, analytical vector loops and the computational model) agree, within <<n(max_dg_vel,1)>> % (velocity) and <<n(max_dg_acc,1)>> % (acceleration) for drawings read at ruler precision, and to 10⁻⁷ between the analytical and computational models.
+4. At θ₂ = 60° the matrix method gives a driving torque of <<n(F0.T12,1)>> N·m and a largest pin force of <<n(pins[0].m,0)>> N at the crank bearing. Over a revolution the torque swings ±<<n(s7.summary.T12_max,0)>> N·m and the crank bearing peaks at <<n(s7.summary.pin_max.F12,0)>> N.
+5. The unbalanced shaking force (up to <<n(s8.stats.unbalanced.Fs_max,0)>> N) can be reduced by <<n(-pct(s8.stats.optimal_lsq.Fs_rms, s8.stats.unbalanced.Fs_rms),0)>> % (RMS) with two counterweights. The residual reciprocating force of the slider can only be removed with an opposed or balancing slider.
+
+# References {#references}
+
+- Alam, F. (2026) *MIET1077 Mechanics of Machines — Lecture & Tutorial notes*, Weeks 1 (Introduction, graphical position analysis, Grashof principle, major-assignment parameters), 3 (graphical velocity & acceleration), 4/5 (instantaneous centre method), 7 (analytical method), 9 (dynamic force analysis) and 10 (balancing). RMIT University.
+- RMIT University (2026) *MIET1077 Supplementary Material — guide to the sample-assignment explanation video* and *Supplementary Document 2: FAQ on the Working Model 2D software*.
+- Subic, A. and Alam, F. (2010) *Mechanics of Machines 2*. RMIT University, Melbourne.
+- Mabie, H.H. and Reinholtz, C.F. (1987) *Mechanisms and Dynamics of Machinery*, 4th edn. John Wiley & Sons, New York.
+- Norton, R.L. (2012) *Design of Machinery: An Introduction to the Synthesis and Analysis of Mechanisms and Machines*, 5th edn. McGraw-Hill, New York.
+- Uicker, J.J., Pennock, G.R. and Shigley, J.E. (2017) *Theory of Machines and Mechanisms*, 5th edn. Oxford University Press, New York.
+- Berkof, R.S. and Lowen, G.G. (1969) 'A new method for completely force balancing simple linkages', *Journal of Engineering for Industry*, 91(1), pp. 21–26.
+
+# Appendix A – Notes on the lecture examples {#appendixA}
+
+While checking this solution against the lecture material, three slips were found in the worked examples. They are listed here so that they do not cause confusion; the *methods and formulas* in the notes are correct.
+
+1. **Week 7, four-bar position example** (a = 40, b = 120, c = 80, d = 100 mm, θ₂ = 40°). The handwritten result gives θ₄(open) = 98° and θ₄(crossed) = −57°. Substituting back into the loop shows |AB| = 79 mm for θ₄ = 98°, not 120 mm. The slip is the extra minus sign written in front of 2 tan⁻¹(…). Without it, the two roots of the same quadratic are θ₄ = −98.0° and θ₄ = **+57.3°**, and the root that pairs with θ₃ = 20.2° (the configuration used in the velocity and acceleration examples) is θ₄ = 57.3°; the other pair is θ₃ = −60.9°, θ₄ = −98.0°.
+2. **Week 7, velocity example** (ω₂ = 25 rad/s). ω₄ is evaluated with sin(40° − 23.3°) instead of sin(40° − 20.3°). The correct value is ω₄ = **7.00 rad/s**, not 5.98 rad/s. The acceleration example inherits this (and uses 45 instead of a = 40 in F), so it should read α₃ ≈ **296 rad/s²** and α₄ ≈ **470 rad/s²**. Both were confirmed by numerical differentiation.
+3. **Week 7, template Part 3 (slider).** The template writes $Y_C + l_5\sin\theta_5 = H$ but also $Y_D = -H$ for a slider below O. For the handout geometry, use $Y_C + l_5\sin\theta_5 = -H$, i.e. $\theta_5 = \arcsin[-(H+Y_C)/l_5]$ (Section 5.1).
+
+**Always check a computed configuration by substituting it back into the loop equations.**
+
+# Appendix B – Software and reproducibility {#appendixB}
+
+All calculations, drawings and this report are generated by the Python scripts in the repository:
+
+| File | Purpose |
+|---|---|
+| `analysis/params.py` | the four given parameters, the selected AB, BE and the data-selection equations |
+| `analysis/kinematics.py` | analytical (complex-number) positions, velocities and accelerations (Section 5) |
+| `analysis/sec1_position.py` … `sec4_ic.py` | graphical constructions drawn to scale (Sections 1–4) |
+| `analysis/dynamics.py`, `sec6_fbd.py` | 14 × 14 matrix method, FBDs, shaking force and moment (Section 6) |
+| `analysis/simulation.py`, `sec7_simulation.py` | independent multibody (Working-Model-equivalent) simulation (Section 7) |
+| `analysis/sec8_balancing.py` | shaking force/moment over a revolution and balancing optimisation (Section 8) |
+| `analysis/run_all.py`, `report/build_report.py` | run everything and rebuild this report |
+
+To use your own parameters, edit the four given values in `analysis/params.py` (and choose AB and BE that satisfy the inequalities), then run `python3 analysis/run_all.py` and `python3 report/build_report.py`.
