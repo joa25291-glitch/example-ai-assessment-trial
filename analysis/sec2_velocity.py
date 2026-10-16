@@ -10,15 +10,20 @@ import numpy as np
 from params import P
 import kinematics as K
 import drawing as Dw
-from drawing import arrow, label, guide, intersect, INK, GREY, BLUE, RED, GREEN, ORANGE, PURPLE, TEAL
+import layout as L
+from drawing import arrow, label, guide, intersect, along, cline, end_tag, INK, GREY, BLUE, RED, GREEN, ORANGE, PURPLE, TEAL
 
-KV = 20.0                    # velocity scale: 1 m/s = 20 mm  (1 mm = 0.05 m/s)
-POLE = complex(160.0, 32.0)  # paper position of the pole o
+KV = float(L.KV)             # velocity scale: 1 m/s = KV mm  (example 1: 20 mm, i.e. 1 mm = 0.05 m/s)
+# paper position of the pole o: polygon centred in the 178 mm frame, pole at most 18 mm from the right edge
+_vx0, _vx1 = L.S["bbox"]["vel"][:2]
+POLE = complex(min(160.0, 89.0 - 0.5 * (_vx0 + _vx1) * KV), 32.0)
+FRAME_H = float(round(max(100.0, POLE.imag + L.S["bbox"]["vel"][3] * KV + 17.0)))     # example 1: 132 mm
 READ_MM = 0.5
 READ_DEG = 0.5
 
 perp = lambda z: 1j * z / abs(z)       # unit vector perpendicular to z
 unit = lambda z: z / abs(z)
+
 
 
 def construct(pos):
@@ -83,20 +88,24 @@ def angular(meas, pos):
 
 
 def fig_velocity_polygon(path, pos, pts):
-    fig, ax = Dw.paper(178, 132)
+    H = FRAME_H
+    fig, ax = Dw.paper(178, H)
     o, a, b, c, d = pts["o"], pts["a"], pts["b"], pts["c"], pts["d"]
     AB, BE, AC, BC, CD = (pos["B"] - pos["A"], pos["B"] - pos["E"], pos["C"] - pos["A"],
                           pos["C"] - pos["B"], pos["D"] - pos["C"])
     lo = Dw.label_on
-    # construction lines (dashed) - each drawn through the known point in the known direction
-    guide(ax, a, perp(AB), -8, 122); label(ax, a + 120 * perp(AB), "⊥AB", dx=5.5, dy=0, color=GREY, size=6.3)
-    guide(ax, o, perp(BE), -10, 106); label(ax, o + 104 * perp(BE), "⊥BE", dx=-1, dy=-3, color=GREY, size=6.3)
-    guide(ax, a, perp(AC), -8, 78); label(ax, a + 32 * perp(AC), "⊥AC", dx=-5.5, dy=0, color=GREY, size=6.3)
-    guide(ax, b, perp(BC), -10, 62); label(ax, b - 8 * perp(BC), "⊥BC", dx=-1, dy=-3.2, color=GREY, size=6.3)
-    guide(ax, o, 1 + 0j, -150, 12); label(ax, o - 150 + 0j, "∥ x-x", dx=1, dy=2.6, color=GREY, size=6.3, ha="left")
-    guide(ax, c, perp(CD), -28, 12); label(ax, c - 26 * perp(CD), "⊥CD", dx=4.5, dy=-1.0, color=GREY, size=6.3)
-    guide(ax, a, perp(pos["G3"] - pos["A"]), 60, 108, color="#9bc9a9")
-    guide(ax, b, perp(pos["G3"] - pos["B"]), -55, -20, color="#9bc9a9")
+    # construction lines (dashed) - each drawn through the known point in the known direction,
+    # long enough to show the intersection that fixes the next polygon point; labelled at the free end
+    g = dict(color=GREY, size=6.3)
+    u = perp(AB); end_tag(ax, a, u, cline(ax, a, u, b, 8, 13.4), "⊥AB", dx=3.5, dy=0, **g)
+    u = perp(BE); end_tag(ax, o, u, cline(ax, o, u, b, 10, 15.3), "⊥BE", back=4, dx=-1, dy=-3, **g)
+    u = perp(AC); end_tag(ax, a, u, cline(ax, a, u, c, 8, 19), "⊥AC", dx=3.5, dy=0, **g)
+    u = perp(BC); end_tag(ax, b, u, cline(ax, b, u, c, 10, 9.7), "⊥BC", dx=-1, dy=3.0, **g)
+    end_tag(ax, o, 1 + 0j, cline(ax, o, 1 + 0j, d, 9.8, 12), "∥ x-x", back=0, dx=1, dy=2.6, ha="left", **g)
+    u = perp(CD); end_tag(ax, c, u, cline(ax, c, u, d, 7.8, 12), "⊥CD", back=0, dx=4.5, dy=-1.0, **g)
+    for p_, G in ((a, pos["G3"] - pos["A"]), (b, pos["G3"] - pos["B"])):     # short segments around g3
+        u = perp(G); tg = along(p_, u, pts["g3"])
+        guide(ax, p_, u, tg - 20, tg + 20, color="#9bc9a9")
     # vectors: absolute from the pole (blue), relative (red)
     for q in (a, b, c, d):
         arrow(ax, o, q, color=BLUE, lw=1.4)
@@ -126,7 +135,7 @@ def fig_velocity_polygon(path, pos, pts):
     lo(ax, c, d, 0.50, "V$_{D/C}$", side=1, dist=6.0, color=RED, bbox=True)
     lo(ax, o, pts["g3"], 0.30, "V$_{G3}$", side=-1, dist=2.8, color=GREEN, size=6.5, bbox=True)
     # scale and notes (top-right, clear of the polygon)
-    Dw.scale_bar(ax, complex(118, 122), 40, "Velocity scale: 1 m/s = 20 mm")
+    Dw.scale_bar(ax, complex(118, H - 10), 40, "Velocity scale: " + L.strings()["vel"])
     notes = ["Step 1:  V$_B$ = V$_A$ + V$_{B/A}$       (⊥BE) = (⊥OA) + (⊥AB)",
              "Step 2:  V$_A$ + V$_{C/A}$ = V$_B$ + V$_{C/B}$   (⊥AC), (⊥BC)",
              "Step 3:  V$_D$ = V$_C$ + V$_{D/C}$        (∥x-x) = (known) + (⊥CD)",
@@ -134,7 +143,7 @@ def fig_velocity_polygon(path, pos, pts):
              "V$_A$ = ω$_2$·OA = %.3f × %.3f = %.3f m/s, ⊥OA" % (P.omega2, P.OA, P.omega2 * P.OA),
              "g$_2$, g$_4$, g$_5$: mid-points of oa, ob, cd (velocity image)"]
     for k, t in enumerate(notes):
-        ax.text(92, 110 - 4.4 * k, t, fontsize=6.2, va="center")
+        ax.text(92, H - 22 - 4.4 * k, t, fontsize=6.2, va="center")
     Dw.save(fig, path)
 
 

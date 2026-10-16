@@ -70,6 +70,31 @@ def guide(ax, p, d, t0=-1.0, t1=1.0, color=GREY, lw=0.6, ls=(0, (4, 3)), zorder=
     return a, b
 
 
+def along(p, u, q):
+    """Signed distance from p to q measured along the unit vector u."""
+    return ((q - p) * np.conj(u)).real
+
+
+def cline(ax, p, u, q, before=8.0, after=13.0, **kw):
+    """Construction line through the known point p in direction +-u (unit vector) that
+    passes through the intersection point q: it starts `before` mm behind p and ends
+    `after` mm beyond q.  Returns (t_start, t_end), measured along u from p."""
+    t = along(p, u, q)
+    s = 1.0 if t >= 0 else -1.0
+    t_start, t_end = -s * before, t + s * after
+    guide(ax, p, u, min(t_start, t_end), max(t_start, t_end), **kw)
+    return t_start, t_end
+
+
+def end_tag(ax, p, u, ts, text, back=2.0, at="end", **kw):
+    """Label a construction line near its free end beyond the intersection (at="end")
+    or near its start behind the known point (at="start")."""
+    t_start, t_end = ts
+    s = 1.0 if t_end >= t_start else -1.0
+    t = t_end - s * back if at == "end" else t_start + s * back
+    label(ax, p + t * u, text, **kw)
+
+
 def intersect(p1, d1, p2, d2):
     M = np.array([[d1.real, -d2.real], [d1.imag, -d2.imag]])
     t = np.linalg.solve(M, np.array([(p2 - p1).real, (p2 - p1).imag]))

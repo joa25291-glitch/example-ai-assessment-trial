@@ -2,17 +2,25 @@
 
 A complete worked solution of the MIET1077 *Mechanics of Machines* major assignment, "Kinematic and dynamic analysis of a linkage mechanism" (six-bar: crank, ternary coupler, rocker, connecting rod, slider). It is meant as a study reference before the in-person assessment.
 
-The four lecturer-given parameters are **example values** (OA = 180 mm, β = 20°, θ₁ = 10°, n₂ = 440 rpm). In the real assessment you get your own, and every number changes.
+Two parameter sets are worked in full. In the real assessment you get your own four values, and every number changes.
+
+| Set | Given: OA, β, θ₁, n₂ | Selected: AB, BE | Report |
+|---|---|---|---|
+| Example 1 | 180 mm, 20°, 10°, 440 rpm | 660 mm, 360 mm | `report/MIET1077_SixBar_Worked_Solution.pdf` |
+| Practice set 2 (mock test) | 265 mm, 16.5°, 12.5°, 472 rpm | 970 mm, 530 mm | `report/MIET1077_SixBar_MockTest2_Worked_Solution.pdf` |
+
+Both sets are made-up values, not anyone's allocated data. For the mock test, try the whole analysis by hand first, then check against the PDF.
 
 ## What to open
 
 | File | What it is |
 |---|---|
-| `report/MIET1077_SixBar_Worked_Solution.pdf` | The full report, laid out like the rubric: cover, TOC, one-page summary, objectives, theory, data selection, Sections 1–8, conclusions, references |
+| `report/MIET1077_SixBar_Worked_Solution.pdf` | Example 1: the full report, laid out like the rubric (cover, TOC, one-page summary, objectives, theory, data selection, Sections 1–8, conclusions, references) |
+| `report/MIET1077_SixBar_MockTest2_Worked_Solution.pdf` | Practice set 2 (mock test): the same full report for the mock-test values |
 | `report/MIET1077_InPerson_Workflow_Guide.pdf` | 3-page condensed workflow: the order of the steps, the formulas to know, the Kennedy-circle steps and the common traps |
-| `report/MIET1077_SixBar_Worked_Solution.docx` | Editable Word version of the report |
-| `output/figures/` | Every drawing (SVG + PNG). The graphical constructions are true to scale when printed at 100 % |
-| `output/tables/`, `output/results.json` | All numerical results |
+| `report/*.docx` | Editable Word versions of the two reports |
+| `output/figures/`, `output_mock2/figures/` | Every drawing (SVG + PNG). The graphical constructions are true to scale when printed at 100 % |
+| `output*/tables/`, `output*/results.json` | All numerical results |
 
 ## What is in the solution
 
@@ -33,13 +41,15 @@ Self-checks built into the code:
 
 ## Generating a practice set
 
-To make a fresh answer key for practice, put made-up values for the four "given" parameters (and AB, BE) in `analysis/params.py`, then:
+Parameter sets live in `PRESETS` in `analysis/params.py` and are chosen with the `MIET_PRESET` environment variable (default `example1`):
 
 ```bash
-pip install -r requirements.txt          # numpy, scipy, matplotlib, jinja2, pypdf
-python3 analysis/run_all.py              # figures, tables, results.json
-python3 report/build_report.py           # PDF + DOCX (needs pandoc, node and playwright/chromium)
-python3 analysis/verify_independent.py   # independent recheck of every reported number
+pip install -r requirements.txt                              # numpy, scipy, matplotlib, jinja2, pypdf
+MIET_PRESET=mock2 python3 analysis/run_all.py                # figures, tables, results.json -> output_mock2/
+MIET_PRESET=mock2 python3 report/build_report.py             # PDF + DOCX (needs pandoc, node and playwright/chromium)
+MIET_PRESET=mock2 python3 analysis/verify_independent.py     # independent recheck of every reported number
 ```
 
-`analysis/params.py` lists the data-selection rules. Pick AB and BE that satisfy both inequalities; around 3.5–3.8·OA and 2·OA works well.
+To make a fresh answer key, add a preset with made-up values for the four "given" parameters (and AB, BE). `analysis/params.py` lists the data-selection rules. Pick AB and BE that satisfy both inequalities; about 3.5–3.8·OA and 2·OA works well.
+
+The drawing scales are chosen automatically from standard scales so each construction fits an A4 page (`analysis/layout.py`): 1:10 and 1:15 for the space diagrams, 1 m/s = 20 or 10 mm for the velocity polygons, 1 mm = 2.5 or 5 m/s² for the acceleration polygons. Every direction, rotation sense and scale quoted in the report text is derived from the results, so a new preset gives a consistent report. The 3-page guide is written around example 1 and is only built for it.

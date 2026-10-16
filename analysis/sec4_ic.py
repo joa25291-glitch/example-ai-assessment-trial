@@ -6,14 +6,17 @@ import kinematics as K
 import ic as IC
 import drawing as Dw
 import sec1_position as S1
+import layout as L
 from drawing import arrow, label, pin, ground, INK, GREY, BLUE, RED, GREEN, ORANGE, PURPLE, TEAL
 
-KVI = 4.0          # velocity arrows on the IC diagram: 1 m/s = 4 mm
-OX, OY = 40.0, 22.0
+KVI = float(L.KVI)             # velocity arrows on the IC diagram: 1 m/s = KVI mm (example 1: 4 mm)
+KIC = 1000.0 / L.N_IC          # paper mm per metre (1:N_IC)
+_ix0, _ix1, _iy0, _iy1 = L.S["bbox"]["ic"]
+OX, OY = float(round(13.0 - _ix0 * KIC)), float(round(17.5 - _iy0 * KIC))     # example 1: (40, 22)
 
 
 def to_paper(z):
-    return complex(OX, OY) + z * 100.0
+    return complex(OX, OY) + z * KIC
 
 
 def fig_ic_diagram(path, pos, I, Vic):
@@ -22,7 +25,8 @@ def fig_ic_diagram(path, pos, I, Vic):
     Pp = {k: to_paper(pos[k]) for k in ["O", "A", "B", "C", "D", "E"]}
     # slider guide
     yD = Pp["D"].imag
-    ax.plot([to_paper(0.55).real, to_paper(1.36).real], [yD - 2.6, yD - 2.6], color=INK, lw=0.8)
+    ax.plot([to_paper(S1.S_LO - 2.08 * P.OA).real, to_paper(S1.S_HI + 0.76 * P.OA).real], [yD - 2.6, yD - 2.6],
+            color=INK, lw=0.8)
     # links
     tri = Dw.Polygon([Dw.P(Pp["A"]), Dw.P(Pp["B"]), Dw.P(Pp["C"])], closed=True, fc="#e3ecf7", ec=INK, lw=1.1, zorder=3)
     ax.add_patch(tri)
@@ -84,7 +88,10 @@ def fig_ic_diagram(path, pos, I, Vic):
     for key, vkey, col in [("A", "VA", BLUE), ("B", "VB", BLUE), ("C", "VC", BLUE), ("D", "VD", BLUE)]:
         v = Vic[vkey]
         arrow(ax, Pp[key], Pp[key] + KVI * v, color=col, lw=1.5, ms=7, zorder=10)
-        side = {"A": 1, "B": 1, "C": 1, "D": -1}[key]
+        if key == "A":      # long sloping arrow: label just beyond its tip, clear of the shaft
+            label(ax, Pp[key] + KVI * v + 3.2j, "V$_%s$ = %.2f m/s" % (key, abs(v)), color=col, size=6.2, bbox=True)
+            continue
+        side = {"B": 1, "C": 1, "D": -1}[key]
         Dw.label_on(ax, Pp[key], Pp[key] + KVI * v, 0.62, "V$_%s$ = %.2f m/s" % (key, abs(v)), side=side,
                     dist=3.4, color=col, size=6.2, bbox=True)
     # radii used
@@ -93,16 +100,16 @@ def fig_ic_diagram(path, pos, I, Vic):
         ax.plot([z0.real, z1.real], [z0.imag, z1.imag], color=GREEN, lw=0.8, zorder=2)
     ax.plot([Ip["12"].real, Ip["26"].real], [Ip["12"].imag, Ip["26"].imag], color=GREEN, lw=1.6, zorder=2)
     label(ax, (Ip["12"] + Ip["26"]) / 2, "r$_{12-26}$", dx=-6.5, dy=0, color=GREEN, size=6.0)
-    Dw.scale_bar(ax, complex(8, 122), 40, "Space 1:10 (40 mm = 0.4 m)")
+    Dw.scale_bar(ax, complex(8, 122), 40, "Space %s (40 mm = %g m)" % (L.strings()["ic"], 40 * L.N_IC / 1000.0))
     ax.plot([8, 8 + 4 * KVI], [113, 113], color=BLUE, lw=1.4)
-    ax.text(8 + 4 * KVI + 2, 113, "velocity: 1 m/s = %.0f mm" % KVI, va="center", fontsize=6.0, color=BLUE)
+    ax.text(8 + 4 * KVI + 2, 113, "velocity: 1 m/s = %g mm" % KVI, va="center", fontsize=6.0, color=BLUE)
     ax.text(8, 107.5, "green = IC radii used;  grey/orange dashed = Kennedy lines", fontsize=5.8, va="center")
     Dw.save(fig, path)
 
 
 def fig_ic_overview(path, pos, I):
-    """All 15 ICs on one sheet at 1:50 (I15 is ~5 m above the slider)."""
-    sc = 20.0                       # 1 m = 20 mm  (1:50)
+    """All 15 ICs on one sheet at a small scale (example 1: 1:50; I15 is ~5 m above the slider)."""
+    sc = 1000.0 / L.N_OV            # paper mm per metre (example 1: 1 m = 20 mm)
     x0, y0 = 14.0, 10.0             # paper position of O
     W, Hh = 84.0, 126.0
     T = lambda z: complex(x0, y0) + z * sc
@@ -111,7 +118,8 @@ def fig_ic_overview(path, pos, I):
     ax.add_patch(Dw.Polygon([Dw.P(Pp["A"]), Dw.P(Pp["B"]), Dw.P(Pp["C"])], closed=True, fc="#e3ecf7", ec=INK, lw=0.6))
     for a, b in [("O", "A"), ("E", "B"), ("C", "D")]:
         ax.plot([Pp[a].real, Pp[b].real], [Pp[a].imag, Pp[b].imag], color=INK, lw=0.9)
-    ax.plot([T(0.55).real, T(1.35).real], [Pp["D"].imag - 0.8, Pp["D"].imag - 0.8], color=INK, lw=0.6)
+    ax.plot([T(S1.S_LO - 2.08 * P.OA).real, T(S1.S_HI + 0.7 * P.OA).real], [Pp["D"].imag - 0.8, Pp["D"].imag - 0.8],
+            color=INK, lw=0.6)
     Ip = {k: (T(v) if not isinstance(v, tuple) else None) for k, v in I.items()}
     # Kennedy lines that locate I15 (I13-I35 and the vertical through D) and check lines
     for a, b in [("13", "15"), ("56", "15"), ("12", "15"), ("14", "15")]:
@@ -126,14 +134,15 @@ def fig_ic_overview(path, pos, I):
     for k, (dx, dy) in lab.items():
         label(ax, Ip[k], "I$_{%s}$" % k, dx=dx, dy=dy, color=RED, size=6.0)
     label(ax, Ip["56"], "I$_{56}$", dx=0.5, dy=-2.6, color=RED, size=6.0)
-    ax.annotate("", xy=(T(1.25).real, Hh - 3), xytext=(T(1.25).real, Hh - 16),
+    x16 = Pp["D"].real + 2.0
+    ax.annotate("", xy=(x16, Hh - 3), xytext=(x16, Hh - 16),
                 arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=0.8))
-    label(ax, complex(T(1.25).real + 1.5, Hh - 10), "I$_{16}$ at ∞\n(vertical)", ha="left", size=5.8, color=TEAL)
+    label(ax, complex(x16 + 1.5, Hh - 10), "I$_{16}$ at ∞\n(vertical)", ha="left", size=5.8, color=TEAL)
     label(ax, Ip["15"], "(%.0f, %.0f) mm" % (I["15"].real * 1000, I["15"].imag * 1000), dx=-1, dy=-3.4, size=5.4,
           color=RED, ha="right")
     ax.text(3, 30, "Mechanism\n(ICs I$_{23}$, I$_{25}$, I$_{26}$,\nI$_{34}$, I$_{35}$, I$_{36}$, I$_{45}$, I$_{46}$\nare close together\nhere - see Figure 8)",
             fontsize=5.4, va="bottom")
-    Dw.scale_bar(ax, complex(44, 18), 20, "1:50 (20 mm = 1 m)")
+    Dw.scale_bar(ax, complex(44, 18), 20, "%s (20 mm = %g m)" % (L.strings()["overview"], 20 * L.N_OV / 1000.0))
     Dw.save(fig, path)
 
 
@@ -191,10 +200,11 @@ def run(outdir):
     fig_ic_diagram(f"{outdir}/figures/fig7_ic_diagram", pos, I, V)
     fig_kennedy_steps(f"{outdir}/figures/fig8_kennedy_circle")
     fig_ic_overview(f"{outdir}/figures/fig7b_ic_overview", pos, I)
-    # distances read from the 1:10 drawing (nearest 0.5 mm -> nearest 5 mm full size)
-    rd = lambda z: float(Dw.round_to(abs(z) * 100.0, 0.5) / 100.0)
-    r = dict(r12A=rd(pos["A"] - I["12"]), r13A=rd(pos["A"] - I["13"]), r13B=rd(pos["B"] - I["13"]),
-             r13C=rd(pos["C"] - I["13"]), r14B=rd(pos["B"] - I["14"]), r12_26=rd(I["26"] - I["12"]),
+    # distances read from the 1:N_IC drawing to the nearest 0.5 mm (1:10 -> nearest 5 mm full size)
+    rd = lambda z: float(Dw.round_to(abs(z) * KIC, 0.5) / KIC)
+    # I12-A = OA and I14-B = BE are link lengths (known exactly); the other radii are measured
+    r = dict(r12A=float(P.OA), r13A=rd(pos["A"] - I["13"]), r13B=rd(pos["B"] - I["13"]),
+             r13C=rd(pos["C"] - I["13"]), r14B=float(P.BE), r12_26=rd(I["26"] - I["12"]),
              r15C=float(abs(pos["C"] - I["15"])), r15D=float(abs(pos["D"] - I["15"])))
     VA = P.omega2 * r["r12A"]
     w3 = VA / r["r13A"]

@@ -6,14 +6,20 @@ from scipy.optimize import brentq
 from params import P
 import kinematics as K
 import drawing as Dw
+import layout as L
 from drawing import arrow, label, guide, pin, ground, angle_arc, scale_bar, INK, GREY, BLUE, RED, GREEN, ORANGE, PURPLE, TEAL
 
-SCALE = 10.0           # space scale 1:10  ->  1 m = 100 mm on paper
+SCALE = float(L.N)     # space scale 1:N (1:10 -> 1 m = 100 mm on paper)
 OX, OY = 32.0, 34.0    # paper position of O (mm)
+K_MM = 1000.0 / SCALE  # paper mm per metre
+SBAR = L.strings()["space_bar"]
+# slider-guide extents on the drawings, from the stroke (metres)
+_S = K.positions(np.radians(np.arange(0.0, 360.0, 1.0)))["S"]
+S_LO, S_HI = float(_S.min()), float(_S.max())
 
 
 def to_paper(z):
-    return complex(OX, OY) + z * 1000.0 / SCALE
+    return complex(OX, OY) + z * K_MM
 
 
 def draw_mechanism(ax, pos, lw=1.6, color=INK, shade=True, labels=True, gmarks=True, alpha=1.0, zorder=5):
@@ -84,6 +90,10 @@ def limits_of_motion():
             entries.append(dict(theta2=float(np.degrees(r) % 360), theta3=float(np.degrees(pos["theta3"])),
                                 theta4=float(np.degrees(pos["theta4"])), theta5=float(np.degrees(pos["theta5"])),
                                 S=float(pos["S"])))
+            if name == "rocker4":       # toggle: OA and AB in line, |OB| = AB + OA (extended) or AB - OA (folded)
+                dOB = abs(pos["B"])
+                entries[-1]["toggle"] = ("extended" if abs(dOB - (P.AB + P.OA)) < abs(dOB - (P.AB - P.OA))
+                                         else "folded")
         res[name] = entries
     return res
 
@@ -92,7 +102,7 @@ def fig_space_diagram(path):
     th2 = np.radians(P.theta2_deg)
     pos, _, _ = K.solve(th2)
     fig, ax = Dw.paper(178, 100)
-    slider_guide(ax, to_paper(0.38).real, to_paper(1.40).real)
+    slider_guide(ax, to_paper(S_LO - 3.0 * P.OA).real, to_paper(S_HI + 0.98 * P.OA).real)
     Pp = draw_mechanism(ax, pos)
     ground(ax, Pp["O"]); ground(ax, Pp["E"])
     # theta1 reference line and OE dashed
@@ -132,7 +142,7 @@ def fig_space_diagram(path):
     ax.annotate("", xy=(w_b.real, w_b.imag), xytext=(w_a.real, w_a.imag),
                 arrowprops=dict(arrowstyle="-|>", connectionstyle="arc3,rad=0.42", lw=0.8, color=RED))
     label(ax, Pp["O"], r"$\omega_2$ (CCW)", dx=-14, dy=4.5, color=RED, size=6.5)
-    scale_bar(ax, complex(118, 88), 50, "Space scale 1:10  (50 mm = 0.5 m)")
+    scale_bar(ax, complex(118, 88), 50, SBAR)
     Dw.save(fig, path)
     return pos
 
@@ -143,7 +153,7 @@ def fig_construction(path):
     pos, _, _ = K.solve(th2)
     fig, ax = Dw.paper(178, 80, y0=22)
     Pp = {k: to_paper(pos[k]) for k in ["O", "A", "B", "C", "D", "E"]}
-    slider_guide(ax, to_paper(0.38).real, to_paper(1.40).real, path_line=True)
+    slider_guide(ax, to_paper(S_LO - 3.0 * P.OA).real, to_paper(S_HI + 0.98 * P.OA).real, path_line=True)
     ground(ax, Pp["O"]); ground(ax, Pp["E"])
     # (a) OA at theta2
     ax.plot([Pp["O"].real, Pp["A"].real], [Pp["O"].imag, Pp["A"].imag], color=INK, lw=1.5)
@@ -152,7 +162,7 @@ def fig_construction(path):
     ax.plot([Pp["O"].real, Pp["E"].real], [Pp["O"].imag, Pp["E"].imag], color=GREY, lw=0.8, ls=(0, (5, 3)))
     label(ax, (Pp["O"] + Pp["E"]) / 2, "(b)", dx=0, dy=-3.5, color=BLUE, weight="bold")
     # (c) arcs: centre A radius AB, centre E radius BE  -> B
-    rAB = P.AB * 100; rBE = P.BE * 100
+    rAB = P.AB * K_MM; rBE = P.BE * K_MM
     aB = np.degrees(np.angle(Pp["B"] - Pp["A"])); eB = np.degrees(np.angle(Pp["B"] - Pp["E"]))
     ax.add_patch(Dw.Arc(Dw.P(Pp["A"]), 2 * rAB, 2 * rAB, theta1=aB - 12, theta2=aB + 12, color=GREEN, lw=0.8))
     ax.add_patch(Dw.Arc(Dw.P(Pp["E"]), 2 * rBE, 2 * rBE, theta1=eB - 25, theta2=eB + 25, color=ORANGE, lw=0.8))
@@ -167,10 +177,10 @@ def fig_construction(path):
     angle_arc(ax, Pp["A"], 16, aB - P.beta_deg, aB, color=PURPLE, text=r"$\beta$", text_r=20)
     label(ax, Pp["C"], "(d)", dx=-2, dy=-5, color=BLUE, weight="bold")
     # (e) horizontal line H below O (already drawn as slider guide)
-    label(ax, complex(to_paper(0.15).real, to_paper(-P.H * 1j).imag), "(e)  path of D: horizontal line H below O",
-          dx=20, dy=-3.0, color=BLUE, size=6.5)
+    label(ax, complex(to_paper(0.833 * P.OA).real, to_paper(-P.H * 1j).imag), "(e)  path of D: horizontal line H below O",
+          dx=20, dy=2.6, color=BLUE, size=6.5)
     # (f) arc centre C radius CD -> D
-    rCD = P.CD * 100
+    rCD = P.CD * K_MM
     cD = np.degrees(np.angle(Pp["D"] - Pp["C"]))
     ax.add_patch(Dw.Arc(Dw.P(Pp["C"]), 2 * rCD, 2 * rCD, theta1=cD - 7, theta2=cD + 7, color=RED, lw=0.8))
     ax.plot([Pp["C"].real, Pp["D"].real], [Pp["C"].imag, Pp["D"].imag], color=INK, lw=1.2)
@@ -179,7 +189,7 @@ def fig_construction(path):
     for k in Pp:
         pin(ax, Pp[k], r=0.9)
         label(ax, Pp[k], k, dx=-2.8 if k in "OA" else 2.8, dy=2.6, weight="bold")
-    scale_bar(ax, complex(118, 88), 50, "Space scale 1:10  (50 mm = 0.5 m)")
+    scale_bar(ax, complex(118, 88), 50, SBAR)
     Dw.save(fig, path)
 
 
@@ -198,7 +208,7 @@ def positions_16():
 
 def fig_16_positions(path, lim):
     fig, ax = Dw.paper(178, 120, y0=-6)
-    slider_guide(ax, to_paper(0.55).real, to_paper(1.42).real)
+    slider_guide(ax, to_paper(S_LO - 2.08 * P.OA).real, to_paper(S_HI + 1.09 * P.OA).real)
     thf = np.radians(np.linspace(0, 360, 721))
     posf = K.positions(thf)
     Pf = {k: to_paper(posf[k]) for k in ["A", "B", "C", "D"]}
@@ -259,7 +269,7 @@ def fig_16_positions(path, lim):
         ax.plot([lx, lx + 6], [ly - 4.2 * k, ly - 4.2 * k], color=col, lw=1.5)
         ax.text(lx + 8, ly - 4.2 * k, txt, va="center", fontsize=6.4)
     ax.text(lx, ly + 6, "Positions 1-16: θ$_2$ = 60° + (i-1)·22.5°  (CCW)", fontsize=6.6, weight="bold")
-    scale_bar(ax, complex(118, 106), 50, "Space scale 1:10  (50 mm = 0.5 m)")
+    scale_bar(ax, complex(118, 106), 50, SBAR)
     Dw.save(fig, path)
 
 

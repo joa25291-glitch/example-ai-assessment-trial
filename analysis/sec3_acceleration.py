@@ -10,11 +10,15 @@ import numpy as np
 from params import P
 import kinematics as K
 import drawing as Dw
+import layout as L
 import sec2_velocity as SV
-from drawing import arrow, label, guide, intersect, INK, GREY, BLUE, RED, GREEN, ORANGE, PURPLE, TEAL
+from drawing import arrow, label, guide, intersect, along, cline, end_tag, INK, GREY, BLUE, RED, GREEN, ORANGE, PURPLE, TEAL
 
-KA = 0.4                      # acceleration scale: 1 m/s^2 = 0.4 mm  (1 mm = 2.5 m/s^2)
-POLE = complex(168.0, 158.0)
+KA = float(L.KA)              # acceleration scale: 1 m/s^2 = KA mm  (example 1: 0.4 mm, i.e. 1 mm = 2.5 m/s^2)
+# sheet: polygon below and left of the pole o', frame tall enough for the polygon plus the legend
+_ax0, _ax1, _ay0, _ay1 = L.S["bbox"]["acc"]
+FRAME_H = float(round(max(110.0, -_ay0 * KA + 27.0)))
+POLE = complex(min(168.0, 95.0 - 0.5 * (_ax0 + _ax1) * KA), FRAME_H - 10.0)
 READ_MM = 0.5
 READ_DEG = 0.5
 perp = lambda z: 1j * z / abs(z)
@@ -109,17 +113,20 @@ def angular(meas, pos):
 
 
 def fig_acceleration_polygon(path, pos, pts):
-    fig, ax = Dw.paper(178, 168)
+    H = FRAME_H
+    fig, ax = Dw.paper(178, H)
     o, a, b, c, d = pts["o"], pts["a"], pts["b"], pts["c"], pts["d"]
     A, B, C, D, E = pos["A"], pos["B"], pos["C"], pos["D"], pos["E"]
     lo = Dw.label_on
-    # construction lines (direction of each unknown tangential component)
-    guide(ax, pts["n1"], perp(B - A), -14, 128); label(ax, pts["n1"] - 12 * perp(B - A), "⊥AB", dx=4.5, color=GREY, size=6.2)
-    guide(ax, pts["n2"], perp(B - E), -8, 166); label(ax, pts["n2"] + 160 * perp(B - E), "⊥BE", dx=0, dy=-3.2, color=GREY, size=6.2)
-    guide(ax, pts["n3"], perp(C - A), -12, 108); label(ax, pts["n3"] - 10 * perp(C - A), "⊥AC", dx=4.5, color=GREY, size=6.2)
-    guide(ax, pts["n4"], perp(C - B), -10, 72); label(ax, pts["n4"] + 70 * perp(C - B), "⊥BC", dx=0, dy=3, color=GREY, size=6.2)
-    guide(ax, pts["n5"], perp(D - C), -12, 80); label(ax, pts["n5"] + 80 * perp(D - C), "⊥CD", dx=5.5, dy=-0.5, color=GREY, size=6.2)
-    guide(ax, o, 1 + 0j, -86, 6); label(ax, o - 86, "∥ x-x", dx=1, dy=2.6, color=GREY, size=6.2, ha="left")
+    # construction lines (direction of each unknown tangential component), each long enough
+    # to pass the intersection that fixes the next polygon point; labelled at the free end
+    g = dict(color=GREY, size=6.2)
+    u = perp(B - A); end_tag(ax, pts["n1"], u, cline(ax, pts["n1"], u, b, 14, 13.6), "⊥AB", at="start", dx=4.5, **g)
+    u = perp(B - E); end_tag(ax, pts["n2"], u, cline(ax, pts["n2"], u, b, 8, 13.4), "⊥BE", back=6, dx=0, dy=-3.2, **g)
+    u = perp(C - A); end_tag(ax, pts["n3"], u, cline(ax, pts["n3"], u, c, 12, 13), "⊥AC", at="start", dx=4.5, **g)
+    u = perp(C - B); end_tag(ax, pts["n4"], u, cline(ax, pts["n4"], u, c, 10, 16.9), "⊥BC", dx=0, dy=3, **g)
+    u = perp(D - C); end_tag(ax, pts["n5"], u, cline(ax, pts["n5"], u, d, 12, 8.7), "⊥CD", back=0, dx=5.5, dy=-0.5, **g)
+    end_tag(ax, o, 1 + 0j, cline(ax, o, 1 + 0j, d, 6, 13.5), "∥ x-x", back=0, dx=1, dy=2.6, ha="left", **g)
     # normal components (orange) and tangential components (purple)
     for f, t in (("o", "n2"), ("a", "n1"), ("a", "n3"), ("b", "n4"), ("c", "n5")):
         arrow(ax, pts[f], pts[t], color=ORANGE, lw=1.0, ms=5)
@@ -138,12 +145,12 @@ def fig_acceleration_polygon(path, pos, pts):
     label(ax, o, "o'", dx=3.0, dy=-2.4, weight="bold", size=8.5)
     label(ax, a, "a'", dx=3.0, dy=-1.5, weight="bold", size=8.5)
     label(ax, b, "b'", dx=-3.0, dy=2.0, weight="bold", size=8.5)
-    label(ax, c, "c'", dx=-3.4, dy=2.6, weight="bold", size=8.5)
+    label(ax, c, "c'", dx=-3.4, dy=2.6, weight="bold", size=8.5, bbox=True)
     label(ax, d, "d'", dx=-1.5, dy=3.0, weight="bold", size=8.5)
     label(ax, pts["g2"], "g$_2$'", dx=3.4, dy=-1.0, color=GREEN, size=7)
     label(ax, pts["g3"], "g$_3$'", dx=-3.6, dy=0.5, color=GREEN, size=7)
     label(ax, pts["g4"], "g$_4$'", dx=0.0, dy=3.0, color=GREEN, size=7)
-    label(ax, pts["g5"], "g$_5$'", dx=-3.8, dy=-1.5, color=GREEN, size=7)
+    label(ax, pts["g5"], "g$_5$'", dx=-3.8, dy=-1.5, color=GREEN, size=7, bbox=True)
     lo(ax, o, a, 0.42, "a$_A$", side=-1, color=BLUE, bbox=True)
     lo(ax, o, b, 0.40, "a$_B$", side=-1, dist=3.0, color=BLUE, bbox=True)
     lo(ax, o, c, 0.62, "a$_C$", side=-1, dist=3.0, color=BLUE, bbox=True)
@@ -162,14 +169,14 @@ def fig_acceleration_polygon(path, pos, pts):
     lo(ax, pts["n4"], c, 0.45, "a$^t_{C/B}$", side=1, dist=3.2, color=PURPLE, size=6.6)
     lo(ax, pts["n5"], d, 0.25, "a$^t_{D/C}$", side=1, dist=3.6, color=PURPLE, size=6.6)
     # scale & legend
-    Dw.scale_bar(ax, complex(20, 157), 40, "Acceleration scale: 1 mm = 2.5 m/s² (40 mm = 100 m/s²)")
+    Dw.scale_bar(ax, complex(20, H - 11), 40, "Acceleration scale: %s (40 mm = %g m/s²)" % (L.strings()["acc"], 40 / KA))
     leg = [("absolute acceleration (from pole o')", BLUE, "-"), ("relative acceleration (resultant)", RED, "-"),
            ("normal component a$^n$ = V²/r (calculated)", ORANGE, "-"),
            ("tangential component a$^t$ = αr (from polygon)", PURPLE, "--"), ("mass-centre acceleration", GREEN, "--")]
-    for k, (t, col, ls) in enumerate(leg):
-        y = 146 - 4.2 * k
-        ax.plot([6, 13], [y, y], color=col, lw=1.3, ls=ls)
-        ax.text(15, y, t, fontsize=6.0, va="center")
+    for k, (t, col, ls) in enumerate(leg):       # bottom right: clear of the polygon, which lies left of o'a'
+        y = 36 - 4.2 * k
+        ax.plot([111, 118], [y, y], color=col, lw=1.3, ls=ls)
+        ax.text(120, y, t, fontsize=6.0, va="center")
     ax.text(5, 14, "g$_2$', g$_4$' = mid-points of o'a' and o'b'", fontsize=5.8, va="center", color=INK)
     ax.text(5, 9.5, "a$^n_{D/C}$ = %.2f mm on paper (too short to draw)" % abs(pts["n5"] - c), fontsize=5.8,
             va="center", color=ORANGE)

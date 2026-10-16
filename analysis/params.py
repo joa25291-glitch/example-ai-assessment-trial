@@ -11,10 +11,17 @@ using the "data selection" (non-equality) equations from the Week 1 lecture:
     H  = OA / 4
 
 All values below are EXAMPLE values chosen for this worked practice solution.
-Replace the four "given" values (and re-select AB, BE) with your own.
+Two parameter sets are defined in PRESETS; pick one with the MIET_PRESET
+environment variable (default "example1"):
+
+    MIET_PRESET=mock2 python3 analysis/run_all.py
+
+To practise with your own made-up values, add a preset with the four "given"
+values (and AB, BE re-selected to satisfy the inequalities).
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import math
+import os
 
 
 @dataclass
@@ -42,6 +49,15 @@ class Params:
     #   "bisector": distance AB/2 from A along the bisector of angle beta (literal reading, used here)
     #   "centroid": centroid of triangle ABC (as sketched on the Week 9 slide / WM polygon default)
     G3_mode: str = "bisector"
+    # ---- bookkeeping for the generated report ----
+    name: str = "example1"                       # preset key; also names the output folder
+    label: str = "Example 1"
+    note: str = "example values — replace with the ones your lecturer gives you"
+
+    @property
+    def out_dir(self):
+        """Folder (relative to the repository root) for figures, tables and results.json."""
+        return "output" if self.name == "example1" else "output_" + self.name
 
     # ---- derived (data selection equations) ----
     @property
@@ -116,4 +132,16 @@ class Params:
         ]
 
 
-P = Params()
+PRESETS = {
+    # worked example of the first report
+    "example1": Params(),
+    # mock test: made-up values (not taken from any class allocation sheet)
+    "mock2": Params(OA=0.265, beta_deg=16.5, theta1_deg=12.5, n2_rpm=472.0, AB=0.970, BE=0.530,
+                    name="mock2", label="Practice set 2 (mock test)",
+                    note="made-up mock-test values, for practice only"),
+}
+
+PRESET = os.environ.get("MIET_PRESET", "example1")
+if PRESET not in PRESETS:
+    raise SystemExit(f"unknown MIET_PRESET {PRESET!r}; choose one of {sorted(PRESETS)}")
+P = PRESETS[PRESET]

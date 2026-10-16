@@ -106,7 +106,12 @@ def stats(Fs, Ms, T):
                 T_max=float(np.max(T)), T_min=float(np.min(T)), T_rms=float(np.sqrt(np.mean(T ** 2))))
 
 
-def run(outdir, RC2=0.12, RC4=0.12):
+def run(outdir, RC2=None, RC4=None):
+    # counterweight radius: about 2/3 of the crank length, rounded to 10 mm (example 1: 120 mm)
+    if RC2 is None:
+        RC2 = round(2.0 * P.OA / 3.0, 2)
+    if RC4 is None:
+        RC4 = RC2
     data = sweep()
     Fs0, Ms0, T0 = base_quantities(data)
     # check against the matrix method at 60 deg
@@ -168,7 +173,7 @@ def run(outdir, RC2=0.12, RC4=0.12):
     ax.set_aspect("equal"); ax.grid(alpha=0.3); ax.axhline(0, color=GREY, lw=0.6); ax.axvline(0, color=GREY, lw=0.6)
     ax.set_xlabel("F$_{s,x}$ (N)", fontsize=8); ax.set_ylabel("F$_{s,y}$ (N)", fontsize=8); ax.tick_params(labelsize=7)
     ax.set_title("Shaking-force polar diagram (tip of F$_s$ over one revolution)", fontsize=8.5)
-    ax.legend(fontsize=6.8, loc="upper left")
+    ax.legend(fontsize=6.8, loc="best")
     ax = axs[1]
     ax.plot(deg, np.abs(Fs0), color=RED, label="|F$_s$| unbalanced")
     ax.plot(deg, np.abs(F1), color=BLUE, ls="--", label="|F$_s$| Berkof-Lowen")

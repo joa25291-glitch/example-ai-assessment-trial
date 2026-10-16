@@ -16,6 +16,7 @@ output/results.json:
   balancing      Berkof-Lowen residual must equal -(m6 + m5/2) a_D
 
 Run from the repository root:  python3 analysis/verify_independent.py
+                (mock test:     MIET_PRESET=mock2 python3 analysis/verify_independent.py)
 """
 import json
 import math
@@ -26,7 +27,10 @@ import numpy as np
 from scipy.optimize import brentq
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-R = json.load(open(os.path.join(ROOT, "output", "results.json")))
+PRESET = os.environ.get("MIET_PRESET", "example1")
+R = json.load(open(os.path.join(ROOT, "output" if PRESET == "example1" else "output_" + PRESET, "results.json")))
+print("checking preset:", R["preset"]["name"], "-", R["preset"]["label"])
+assert R["preset"]["name"] == PRESET
 
 # ---------------------------------------------------------------- inputs (handout + selection rules)
 pr = R["params"]
@@ -39,6 +43,7 @@ H = OA / 4
 w2 = 2 * math.pi * n2 / 60
 m = dict(m2=1.0, m3=2.5, m4=1.5, m5=1.8, m6=0.9)          # handout item 6
 I = dict(I2=0.002, I3=0.008, I4=0.005, I5=0.006)
+assert pr["masses"] == m and pr["inertias"] == I, "report used different mass properties from the handout"
 E = OE * complex(math.cos(th1), math.sin(th1))
 
 FAILS = []
@@ -322,7 +327,7 @@ for kk, fs in zip(ks, Fs_all):
 check("Berkof-Lowen residual = -(m6+m5/2) a_D (N)", resid, 0.0, 1e-3)
 
 print("\n[10] Graphical constructions are geometrically exact before rounding")
-KV, KA = 20.0, 0.4
+KV, KA = R["scales"]["KV"], R["scales"]["KA"]           # drawing scales used for this parameter set
 vm = R["sec2"]["measured"]
 exact_v = {"V_A": k["VA"], "V_B": k["VB"], "V_C": k["VC"], "V_D": k["VD"], "V_B/A": k["VB"] - k["VA"],
            "V_C/A": k["VC"] - k["VA"], "V_C/B": k["VC"] - k["VB"], "V_D/C": k["VD"] - k["VC"],

@@ -1,10 +1,12 @@
 """Build the worked-solution report (Markdown -> HTML/PDF via Chromium, and DOCX).
 
-    python3 report/build_report.py            # uses output/results.json (run analysis/run_all.py first)
+    python3 report/build_report.py                      # example 1: output/results.json
+    MIET_PRESET=mock2 python3 report/build_report.py    # mock test: output_mock2/results.json
 
-Every number in the report text is pulled from output/results.json, so changing
-the parameters in analysis/params.py and re-running both scripts regenerates a
-consistent report.
+Run analysis/run_all.py with the same MIET_PRESET first.  Every number in the
+report text is pulled from results.json, and every direction, sense and scale
+statement is derived from it too, so a new parameter preset gives a consistent
+report.
 """
 import cmath
 import json
@@ -19,13 +21,19 @@ import jinja2
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-OUT = os.path.join(ROOT, "output")
 sys.path.insert(0, os.path.join(ROOT, "analysis"))
+from params import P  # noqa: E402  (preset chosen by MIET_PRESET)
 
+OUT = os.path.join(ROOT, P.out_dir)
+EX1 = P.name == "example1"
 KATEX_DIR = os.environ.get("KATEX_DIR", "")
-PDF_NAME = "MIET1077_SixBar_Worked_Solution.pdf"
+TAG = "" if EX1 else "_" + {"mock2": "MockTest2"}.get(P.name, P.name)
+PDF_NAME = "MIET1077_SixBar%s_Worked_Solution.pdf" % TAG
 GUIDE_PDF_NAME = "MIET1077_InPerson_Workflow_Guide.pdf"
-DOCX_NAME = "MIET1077_SixBar_Worked_Solution.docx"
+DOCX_NAME = "MIET1077_SixBar%s_Worked_Solution.docx" % TAG
+BUILD = os.path.join(HERE, "build" if EX1 else "build_" + P.name)
+FOOTER = ("MIET1077 · Six-bar linkage · worked practice solution (example parameters)" if EX1 else
+          "MIET1077 · Six-bar linkage · %s · worked solution (made-up parameters)" % P.label.lower())
 
 
 # ---------------------------------------------------------------- formatting helpers
@@ -57,6 +65,44 @@ def sense(w):
     return "CCW" if w > 0 else "CW"
 
 
+def sense_word(w):
+    return "anticlockwise" if w > 0 else "clockwise"
+
+
+def senses(*ws):
+    """'all CCW' when the senses agree, otherwise 'CCW, CW, CCW'."""
+    ss = [sense(w) for w in ws]
+    return "all " + ss[0] if len(set(ss)) == 1 else ", ".join(ss)
+
+
+def lr(v):
+    return "to the left" if v < 0 else "to the right"
+
+
+def larrow(v):
+    return "←" if v < 0 else "→"
+
+
+def gv(x, d=3):
+    """Given / selected values with as many decimals as they need: 16.5 -> '16.5', 20.0 -> '20'."""
+    s = f"{float(x):.{d}f}".rstrip("0").rstrip(".")
+    return s.replace("-", "−")
+
+
+def sgn(x, d=2):
+    """Number with an explicit sign: +73.16 / −73.16."""
+    return ("+" if float(x) > 0 else "") + n(x, d)
+
+
+def pm(x, d=2):
+    """'+ 12.30' or '− 12.30' for writing a sum term by term."""
+    return ("− " if float(x) < 0 else "+ ") + n(abs(float(x)), d)
+
+
+def falls(new, old):
+    return "falls" if new < old else "rises"
+
+
 def vname(name):
     """'V_B/A' -> '$V_{B/A}$'"""
     return "$V_{%s}$" % name[2:]
@@ -74,9 +120,11 @@ def aname(name):
 def build_context(R):
     a = R["analytical60"]
     ctx = dict(R=R, a=a, n=n, c=c, mag=mag, ang=ang, pct=pct, sense=sense, abs=abs, math=math, len=len,
-               vname=vname, aname=aname,
+               vname=vname, aname=aname, sense_word=sense_word, senses=senses, lr=lr, larrow=larrow, gv=gv,
+               sgn=sgn, pm=pm, falls=falls, round=round, min=min, max=max,
                p=R["params"], s1=R["sec1"], s2=R["sec2"], s3=R["sec3"], s4=R["sec4"], s6=R["sec6"],
-               s7=R["sec7"], s8=R["sec8"], wm=R["wm"])
+               s7=R["sec7"], s8=R["sec8"], wm=R["wm"], sc=R["scales"], st=R["scales"]["text"], preset=R["preset"],
+               ex1=(R["preset"]["name"] == "example1"))
     # ---------------- comparison table at theta2 = 60 deg ----------------
     vm, am = R["sec2"]["measured"], R["sec3"]["measured"]
     va, aa = R["sec2"]["angular"], R["sec3"]["angular"]
@@ -109,6 +157,22 @@ def build_context(R):
     ctx["max_dg_vel"] = max(abs(r["dg"]) for r in rows[:7])
     ctx["max_dg_acc"] = max(abs(r["dg"]) for r in rows[7:])
     ctx["max_dic"] = max(abs(r["dic"]) for r in rows if r["dic"] is not None)
+    # which reading limits the accuracy (quoted in the summary and the discussion)
+    ctx["g_worst"] = max(rows[:7], key=lambda r: abs(r["dg"]))
+    ctx["ic_worst"] = max((r for r in rows if r["dic"] is not None), key=lambda r: abs(r["dic"]))
+    rel = [k for k in ("V_B/A", "V_C/A", "V_C/B", "V_D/C")]
+    short = min(rel, key=lambda k: vm[k]["length_exact"])
+    ctx["short_v"] = dict(name=vname(short), mm=vm[short]["length_exact"], pct=25.0 / vm[short]["length_exact"],
+                          derived={"V_D/C": "$\\omega_5$", "V_B/A": "$\\omega_3$", "V_C/A": "$\\omega_3$"}.get(short))
+    N_ic = R["scales"]["N_ic"]
+    r26 = abs(complex(*R["sec4"]["ics"]["26"]))
+    ctx["r26"] = dict(full=r26 * 1000, paper=r26 * 1000 / N_ic, pct=25.0 / (r26 * 1000 / N_ic))
+    # Working Model rounds the animation-step box to 3 decimals (FAQ)
+    f16, f6, w2 = round(R["wm"]["frame16"], 3), round(R["wm"]["frame6"], 3), R["params"]["omega2"]
+    ctx["wmr"] = dict(f16=f16, f6=f6, deg16=math.degrees(w2 * f16), over=16 * math.degrees(w2 * f16) - 360,
+                      deg6=math.degrees(w2 * f6))
+    th = a["template"]
+    ctx["th4_sign"] = "−" if abs(a["theta4"] - th["th4_minus"]) < abs(a["theta4"] - th["th4_plus"]) else "+"
     g = 9.81
     ratios = [mag(a[k]) / g for k in ("aG2", "aG3", "aG4", "aG5", "aG6")]
     ctx["gmin"], ctx["gmax"] = min(ratios), max(ratios)
@@ -127,6 +191,13 @@ def build_context(R):
                          m3=abs(z3)))
     ctx["pins"] = pins
     ctx["F0"], ctx["F3"] = F0, F3
+    ctx["pin60"] = max(pins, key=lambda q: q["m"])          # largest pin force at 60 deg
+    JOINT = {"F12": "crank bearing O", "F32": "pin A", "F43": "pin B", "F14": "rocker bearing E", "F53": "pin C",
+             "F65": "pin D"}
+    ctx["joint"] = JOINT
+    pmax = R["sec7"]["summary"]["pin_max"]
+    ctx["pin_rev"] = [dict(key=k, joint=JOINT[k], m=pmax[k], at=R["sec7"]["summary"]["pin_max_at"][k])
+                      for k in sorted(pmax, key=pmax.get, reverse=True)]
     # time ratio of slider
     sl = sorted(R["sec1"]["limits"]["slider6"], key=lambda e: e["S"])
     th_L, th_R = sl[0]["theta2"], sl[1]["theta2"]
@@ -138,6 +209,18 @@ def build_context(R):
     ctx.update(rk_min=rk[0], rk_max=rk[1], rk_swing=rk[1]["theta4"] - rk[0]["theta4"],
                rk_ang1=(rk[1]["theta2"] - rk[0]["theta2"]) % 360)
     ctx["rk_ang2"] = 360 - ctx["rk_ang1"]
+    # balancing wording
+    s8 = R["sec8"]
+    ctx["rc_mm"] = s8["RC2"] * 1000
+    bl, op = s8["designs"]["berkof_lowen"], s8["designs"]["optimal_lsq"]
+    a2, a4 = ang(bl["u2"]), ang(bl["u4"])
+    ctx["cw2_where"] = ("almost opposite A" if abs(a2 - 180) < 30 else "at %s° from OA" % n(a2, 0))
+    ctx["cw4_where"] = ("on an extension of the rocker beyond E" if abs(a4 - 180) < 45 else "on the rocker")
+    P2b, P2o = mag(s8["berkof"]["P2"]), mag(s8["optimal"]["P2"])
+    P4b, P4o = mag(s8["berkof"]["P4"]), mag(s8["optimal"]["P4"])
+    ctx["opt_over"] = (P2o > P2b and P4o > P4b)
+    un = s8["stats"]["unbalanced"]
+    ctx["fs_dir"] = "horizontal" if un["Fsx_max"] >= un["Fsy_max"] else "vertical"
     # matrix (numeric) rows for display
     A = R["sec6"]["0.0"]["matrix"]; rhs = R["sec6"]["0.0"]["rhs"]
     ctx["Amat"], ctx["rhs"] = A, rhs
@@ -220,7 +303,7 @@ def find_pages(pdf_path, items, start_page=2):
     return pages
 
 
-def print_pdf(html_path, pdf_path, footer="MIET1077 · Six-bar linkage · worked practice solution (example parameters)"):
+def print_pdf(html_path, pdf_path, footer=FOOTER):
     env = dict(os.environ)
     env["NODE_PATH"] = env.get("NODE_PATH", "/opt/node22/lib/node_modules")
     subprocess.run(["node", os.path.join(HERE, "print_pdf.js"), html_path, pdf_path, footer], check=True, env=env)
@@ -230,7 +313,7 @@ def main():
     with open(os.path.join(OUT, "results.json")) as f:
         R = json.load(f)
     ctx = build_context(R)
-    build = os.path.join(HERE, "build")
+    build = BUILD
     os.makedirs(build, exist_ok=True)
     figdir = os.path.join(build, "figures")
     if os.path.exists(figdir):
@@ -250,8 +333,8 @@ def main():
               "--resource-path", build]
     html_path = os.path.join(build, "report.html")
     subprocess.run(["pandoc", os.path.join(build, "report_html.md"), *common, "--standalone", "--katex=katex/",
-                    "--css", "style.css", "--metadata", "pagetitle=MIET1077 Six-Bar Linkage – Worked Solution",
-                    "-o", html_path], check=True)
+                    "--css", "style.css", "--metadata", "pagetitle=MIET1077 Six-Bar Linkage – Worked Solution"
+                    + ("" if EX1 else " (" + P.label + ")"), "-o", html_path], check=True)
     shutil.copy(os.path.join(HERE, "style.css"), os.path.join(build, "style.css"))
     with open(html_path) as f:
         html = f.read()
@@ -270,7 +353,13 @@ def main():
     missing = [hid for _, hid, _ in items if hid not in pages]
     if missing:
         print("WARNING: TOC page not found for", missing)
-    # companion guide for the in-person assessment
+    # companion guide for the in-person assessment (written around example 1, so built only for it)
+    if not EX1:
+        subprocess.run(["pandoc", os.path.join(build, "report_docx.md"), *common, "--toc", "--toc-depth=2",
+                        "--metadata", "title=MIET1077 Six-Bar Linkage – " + P.label + " (Worked Solution)",
+                        "-o", os.path.join(HERE, DOCX_NAME)], check=True)
+        print("done:", pdf_path, os.path.join(HERE, DOCX_NAME))
+        return
     guide_md = os.path.join(build, "guide.md")
     with open(guide_md, "w") as f:
         f.write(render_markdown(dict(ctx, target="html"), "svg", name="guide.md.j2"))

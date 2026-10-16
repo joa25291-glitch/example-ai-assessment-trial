@@ -1,13 +1,16 @@
 """Run every section and collect the numbers used by the report.
 
-    cd analysis && python3 run_all.py
+    python3 analysis/run_all.py                       # example 1   -> output/
+    MIET_PRESET=mock2 python3 analysis/run_all.py     # mock test   -> output_mock2/
 
-Outputs: ../output/figures/*.svg|png, ../output/tables/*.csv, ../output/results.json
+Outputs: <out>/figures/*.svg|png, <out>/tables/*.csv, <out>/results.json
 """
+import dataclasses
 import json
 import os
 import numpy as np
 from params import P
+import layout as L
 import kinematics as K
 import ic as IC
 import sec1_position as S1
@@ -18,7 +21,7 @@ import sec6_fbd as S6
 import sec7_simulation as S7
 import sec8_balancing as S8
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output")
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), P.out_dir)
 
 
 def cnum(z):
@@ -82,6 +85,8 @@ def main():
     os.makedirs(os.path.join(OUT, "figures"), exist_ok=True)
     os.makedirs(os.path.join(OUT, "tables"), exist_ok=True)
     R = {}
+    R["preset"] = dict(name=P.name, label=P.label, note=P.note)
+    R["scales"] = dict(N=L.N, N_ic=L.N_IC, N_ov=L.N_OV, KV=L.KV, KA=L.KA, KVI=L.KVI, text=L.strings())
     R["params"] = dict(OA=P.OA, beta_deg=P.beta_deg, theta1_deg=P.theta1_deg, n2_rpm=P.n2_rpm, AB=P.AB, BE=P.BE,
                        OE=P.OE, CD=P.CD, AC=P.AC, H=P.H, omega2=P.omega2,
                        masses=dict(m2=P.m2, m3=P.m3, m4=P.m4, m5=P.m5, m6=P.m6),
@@ -114,11 +119,10 @@ def main():
                        theta5=[float(np.degrees(pos["theta5"]).min()), float(np.degrees(pos["theta5"]).max())],
                        S=[float(pos["S"].min()), float(pos["S"].max())])
     # sensitivity of the dynamic results at 60 deg to the G3 interpretation (bisector vs centroid)
-    from params import Params
     import dynamics as Dy
     sens = {}
     for mode in ("bisector", "centroid"):
-        pm = Params(G3_mode=mode)
+        pm = dataclasses.replace(P, G3_mode=mode)
         ps, vs, ac = K.solve(np.radians(60.0), pm)
         Fm = Dy.solve_forces(ps, vs, ac, pm)
         sens[mode] = dict(aG3=abs(ac["aG3"]), T12=Fm["T12"], F12=abs(Fm["F12x"] + 1j * Fm["F12y"]),
