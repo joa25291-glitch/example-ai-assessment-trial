@@ -43,7 +43,11 @@ This report analyses the six-bar linkage of the MIET1077 major assignment: a cra
 
 **Agreement between methods.** The graphical polygons, read with ruler precision (±0.5 mm), agree with the analytical vector-loop solution to within <<n(max_dg_vel,1)>> % for velocities and <<n(max_dg_acc,1)>> % for accelerations. The instantaneous-centre method agrees to within <<n(max_dic,1)>> %; its largest error comes from reading a short (≈15 mm) radius at 1:10 scale. An independent multibody simulation, built the way Working Model builds a model (bodies, pins, slot, velocity motor) and integrated in time, reproduces every analytical quantity, including all pin forces and the motor torque, to better than 10⁻⁷ over the whole revolution.
 
-**Balancing recommendation.** Counterweights on the two ground-pivoted links reduce the RMS shaking force by <<n(-pct(s8.stats.berkof_lowen.Fs_rms, s8.stats.unbalanced.Fs_rms),0)>> % with the exact Berkof–Lowen (four-bar) solution, and by <<n(-pct(s8.stats.optimal_lsq.Fs_rms, s8.stats.unbalanced.Fs_rms),0)>> % with a least-squares optimum. The residual is the reciprocating inertia of the slider plus half of link 5, which no rotating counterweight can cancel completely. The cost is extra moving mass (about <<n(s8.designs.berkof_lowen.m2c + s8.designs.berkof_lowen.m4c,1)>> kg at 120 mm radius) and a larger torque fluctuation, so a flywheel should be specified together with the counterweights.
+**Recommendations.**
+
+- **Balance:** fit counterweights on the crank and the rocker. They cut the RMS shaking force by <<n(-pct(s8.stats.berkof_lowen.Fs_rms, s8.stats.unbalanced.Fs_rms),0)>> % (exact Berkof–Lowen solution, about <<n(s8.designs.berkof_lowen.m2c + s8.designs.berkof_lowen.m4c,1)>> kg at 120 mm radius) or <<n(-pct(s8.stats.optimal_lsq.Fs_rms, s8.stats.unbalanced.Fs_rms),0)>> % (least-squares optimum). The slider's reciprocating inertia cannot be cancelled by rotating weights.
+- **Drive:** the motor sees ±<<n(s7.summary.T12_max,0)>> N·m peaks with zero mean; specify a flywheel so the speed stays constant, especially once counterweights are added.
+- **Bearings:** rate the crank bearing O and pin A for ≈ <<n(s7.summary.pin_max.F12/1000,1)>> kN and ≈ <<n(s7.summary.pin_max.F32/1000,1)>> kN peak dynamic load (plus the usual safety factor).
 
 # Objectives {#objectives}
 
@@ -341,14 +345,17 @@ $$x_A = l_2\cos\theta_2 = <<n(p.OA*1000,0)>>\cos60^\circ = <<n(d.pos_A[0]*1000,2
 **Part 2 – coupler and rocker (points B and C).** Following the template, let $\mathbf R_{AE} = \mathbf R_1 - \mathbf R_2 = \text{Re} + j\,\text{Im}$:
 $$\text{Re} = l_1\cos\theta_1 - l_2\cos\theta_2 = <<n(p.OE,3)>>\cos<<n(p.theta1_deg,0)>>^\circ - <<n(p.OA,3)>>\cos60^\circ = <<n(d.template.Re,5)>>\ \text{m}$$
 $$\text{Im} = l_1\sin\theta_1 - l_2\sin\theta_2 = <<n(p.OE,3)>>\sin<<n(p.theta1_deg,0)>>^\circ - <<n(p.OA,3)>>\sin60^\circ = <<n(d.template.Im,5)>>\ \text{m}$$
-Loop 1 becomes $l_3e^{j\theta_3} = \text{Re} + j\text{Im} + l_4e^{j\theta_4}$. Taking the squared magnitude of both sides eliminates θ₃:
+Loop 1 becomes $l_3e^{j\theta_3} = \text{Re} + j\text{Im} + l_4e^{j\theta_4}$. Its real and imaginary parts are
+$$l_3\cos\theta_3 = \text{Re} + l_4\cos\theta_4,\qquad l_3\sin\theta_3 = \text{Im} + l_4\sin\theta_4 .$$
+Squaring and adding eliminates θ₃:
+$$l_3^2 = \text{Re}^2 + \text{Im}^2 + l_4^2 + 2l_4(\text{Re}\cos\theta_4 + \text{Im}\sin\theta_4)\quad\Rightarrow$$
 $$\text{Re}\cos\theta_4 + \text{Im}\sin\theta_4 + C = 0,\qquad C = \frac{\text{Re}^2+\text{Im}^2+l_4^2-l_3^2}{2l_4} = <<n(d.template.C,5)>>\ \text{m}.$$
-With $\sin\theta_4 = \dfrac{2t}{1+t^2}$, $\cos\theta_4 = \dfrac{1-t^2}{1+t^2}$ and $t = \tan(\theta_4/2)$:
-$$(C-\text{Re})\,t^2 + 2\,\text{Im}\,t + (C+\text{Re}) = 0,$$
+With $t = \tan(\theta_4/2)$, $\sin\theta_4 = \dfrac{2t}{1+t^2}$ and $\cos\theta_4 = \dfrac{1-t^2}{1+t^2}$; multiplying through by $(1+t^2)$:
+$$\text{Re}\,(1-t^2) + 2\,\text{Im}\,t + C\,(1+t^2) = 0\quad\Rightarrow\quad (C-\text{Re})\,t^2 + 2\,\text{Im}\,t + (C+\text{Re}) = 0,$$
 $$t = \frac{-\text{Im}\pm\sqrt{\text{Re}^2+\text{Im}^2-C^2}}{C-\text{Re}} = \frac{<<n(-d.template.Im,5)>> \pm <<n(d.template.sqrt,5)>>}{<<n(d.template.C - d.template.Re,5)>>}.$$
 The two roots are $t = <<n(d.template.t_minus,4)>>$ (θ₄ = <<n(d.template.th4_minus,3)>>°) and $t = <<n(d.template.t_plus,4)>>$ (θ₄ = <<n(d.template.th4_plus,3)>>°). The template takes the solution with 0 < θ₄ < π, which is the open configuration of the handout figure (B above E):
 $$\theta_4 = <<n(d.theta4,3)>>^\circ\quad(\text{the “−” sign here}).$$
-From the triangle AB′B of the template:
+θ₃ follows from the two component equations above and the half-angle identity $\tan(\theta_3/2) = \sin\theta_3/(1+\cos\theta_3)$, which is the template's triangle AB′B result:
 $$\theta_3 = 2\arctan\frac{\text{Im} + l_4\sin\theta_4}{l_3 + \text{Re} + l_4\cos\theta_4} = 2\arctan\frac{<<n(d.template.Im + p.BE*math.sin(math.radians(d.theta4)),5)>>}{<<n(p.AB + d.template.Re + p.BE*math.cos(math.radians(d.theta4)),5)>>} = <<n(d.theta3,3)>>^\circ.$$
 Hence $\mathbf R_B = \mathbf R_1 + l_4e^{j\theta_4}$, i.e. B = (<<n(d.pos_B[0]*1000,2)>>, <<n(d.pos_B[1]*1000,2)>>) mm, and $\mathbf R_C = \mathbf R_2 + \overline{AC}e^{j(\theta_3-\beta)}$ with θ₃ − β = <<n(d.theta3 - p.beta_deg,3)>>°, i.e. C = (<<n(d.pos_C[0]*1000,2)>>, <<n(d.pos_C[1]*1000,2)>>) mm. Check: |B − A| = <<n(p.AB*1000,3)>> mm ✓.
 
@@ -362,7 +369,12 @@ $$S = x_D = x_C + l_5\cos\theta_5 = <<n(d.pos_C[0]*1000,2)>> + <<n(p.CD*1000,0)>
 
 Differentiating loop 1 with respect to time (θ₁, l's constant):
 $$j l_2\omega_2e^{j\theta_2} + j l_3\omega_3e^{j\theta_3} - j l_4\omega_4e^{j\theta_4} = 0 \quad\Leftrightarrow\quad \mathbf V_A + \mathbf V_{B/A} = \mathbf V_B.$$
-The real and imaginary parts give two linear equations in ω₃, ω₄. Solving them (Week 7):
+Substituting $je^{j\theta} = -\sin\theta + j\cos\theta$ and separating real and imaginary parts gives two linear equations in ω₃ and ω₄:
+$$\text{Re:}\quad -l_2\omega_2\sin\theta_2 - l_3\omega_3\sin\theta_3 + l_4\omega_4\sin\theta_4 = 0$$
+$$\text{Im:}\quad\ \ \ l_2\omega_2\cos\theta_2 + l_3\omega_3\cos\theta_3 - l_4\omega_4\cos\theta_4 = 0$$
+Multiplying Re by cos θ₄ and Im by sin θ₄ and adding eliminates ω₄; multiplying by cos θ₃ and sin θ₃ eliminates ω₃. With $\sin(x-y) = \sin x\cos y - \cos x\sin y$:
+$$l_2\omega_2\sin(\theta_4-\theta_2) + l_3\omega_3\sin(\theta_4-\theta_3) = 0,\qquad l_2\omega_2\sin(\theta_3-\theta_2) + l_4\omega_4\sin(\theta_4-\theta_3) = 0,$$
+so (Week 7):
 $$\omega_3 = \frac{l_2\omega_2\sin(\theta_4-\theta_2)}{l_3\sin(\theta_3-\theta_4)} = \frac{<<n(p.OA,3)>>(<<n(p.omega2,4)>>)\sin(<<n(d.theta4-60,3)>>^\circ)}{<<n(p.AB,3)>>\sin(<<n(d.theta3-d.theta4,3)>>^\circ)} = <<n(d.omega3,4)>>\ \text{rad/s (CW)}$$
 $$\omega_4 = \frac{l_2\omega_2\sin(\theta_2-\theta_3)}{l_4\sin(\theta_4-\theta_3)} = \frac{<<n(p.OA,3)>>(<<n(p.omega2,4)>>)\sin(<<n(60-d.theta3,3)>>^\circ)}{<<n(p.BE,3)>>\sin(<<n(d.theta4-d.theta3,3)>>^\circ)} = <<n(d.omega4,4)>>\ \text{rad/s (CCW)}$$
 Point velocities, using $j e^{j\theta} = -\sin\theta + j\cos\theta$:
@@ -378,20 +390,24 @@ Mass-centre velocities: $\mathbf V_{G3} = \mathbf V_A + j\tfrac{l_3}{2}\omega_3e
 
 Differentiating the velocity loop again:
 $$(j\alpha_2 - \omega_2^2)l_2e^{j\theta_2} + (j\alpha_3 - \omega_3^2)l_3e^{j\theta_3} - (j\alpha_4-\omega_4^2)l_4e^{j\theta_4} = 0\quad\Leftrightarrow\quad \mathbf a_A + \mathbf a_{B/A} = \mathbf a_B .$$
-Separating real and imaginary parts and using the Week 7 constants (with a = l₂, b = l₃, c = l₄):
+Substituting $e^{j\theta} = \cos\theta + j\sin\theta$ and separating real and imaginary parts (with a = l₂, b = l₃, c = l₄):
+$$\text{Re:}\quad -a\alpha_2\sin\theta_2 - a\omega_2^2\cos\theta_2 - b\alpha_3\sin\theta_3 - b\omega_3^2\cos\theta_3 + c\alpha_4\sin\theta_4 + c\omega_4^2\cos\theta_4 = 0$$
+$$\text{Im:}\quad\ \ \ a\alpha_2\cos\theta_2 - a\omega_2^2\sin\theta_2 + b\alpha_3\cos\theta_3 - b\omega_3^2\sin\theta_3 - c\alpha_4\cos\theta_4 + c\omega_4^2\sin\theta_4 = 0$$
+Moving the known terms to the right-hand side gives the linear system $A\alpha_4 - B\alpha_3 = C$ (Re) and $D\alpha_4 - E\alpha_3 = F$ (Im), with the Week 7 constants:
 $$\begin{aligned}
 A &= c\sin\theta_4 = <<n(d.consts.A,5)>>, & B &= b\sin\theta_3 = <<n(d.consts.B,5)>>,\\
 D &= c\cos\theta_4 = <<n(d.consts.D,5)>>, & E &= b\cos\theta_3 = <<n(d.consts.E,5)>>,
 \end{aligned}$$
 $$C = a\alpha_2\sin\theta_2 + a\omega_2^2\cos\theta_2 + b\omega_3^2\cos\theta_3 - c\omega_4^2\cos\theta_4 = <<n(d.consts.C,3)>>,$$
 $$F = a\alpha_2\cos\theta_2 - a\omega_2^2\sin\theta_2 - b\omega_3^2\sin\theta_3 + c\omega_4^2\sin\theta_4 = <<n(d.consts.F,3)>>,$$
+Solving the 2 × 2 system by Cramer's rule:
 $$\alpha_3 = \frac{CD - AF}{AE - BD} = <<n(d.alpha3,3)>>\ \text{rad/s}^2\ (\text{CCW}),$$
 $$\alpha_4 = \frac{CE - BF}{AE - BD} = <<n(d.alpha4,3)>>\ \text{rad/s}^2\ (\text{CCW}).$$
 Point accelerations:
 $$\mathbf a_A = (j\alpha_2-\omega_2^2)l_2e^{j\theta_2} = <<n(d.aA[0],3)>> + j(<<n(d.aA[1],3)>>)\ \text{m/s}^2$$
 $$\mathbf a_B = (j\alpha_4-\omega_4^2)l_4e^{j\theta_4} = <<n(d.aB[0],3)>> + j(<<n(d.aB[1],3)>>)\ \text{m/s}^2$$
 $$\mathbf a_C = \mathbf a_A + (j\alpha_3-\omega_3^2)\overline{AC}\,e^{j(\theta_3-\beta)} = <<n(d.aC[0],3)>> + j(<<n(d.aC[1],3)>>)\ \text{m/s}^2$$
-Differentiating loop 2 again, $\mathbf a_C + (j\alpha_5-\omega_5^2)l_5e^{j\theta_5} = \ddot S$:
+Differentiating loop 2 again, $\mathbf a_C + (j\alpha_5-\omega_5^2)l_5e^{j\theta_5} = \ddot S$ (real). The imaginary part is $a_{Cy} + l_5\alpha_5\cos\theta_5 - l_5\omega_5^2\sin\theta_5 = 0$ and the real part gives $\ddot S$:
 $$\alpha_5 = \frac{l_5\omega_5^2\sin\theta_5 - a_{Cy}}{l_5\cos\theta_5} = <<n(d.alpha5,3)>>\ \text{rad/s}^2\ (\text{CCW}),$$
 $$a_D = \ddot S = a_{Cx} - l_5\alpha_5\sin\theta_5 - l_5\omega_5^2\cos\theta_5 = <<n(d.aD[0],3)>>\ \text{m/s}^2 .$$
 Mass-centre accelerations, used in Section 6:
@@ -705,7 +721,28 @@ While checking this solution against the lecture material, three slips were foun
 
 **Always check a computed configuration by substituting it back into the loop equations.**
 
-# Appendix B – Software and reproducibility {#appendixB}
+# Appendix B – Rubric and handout checklist {#appendixB}
+
+| Rubric criterion (marks) | Where it is answered |
+|---|---|
+| Title page: cover page and table of contents (0.5) | Cover (page 1); Table of Contents (page 2) |
+| Summary on one page, useful to an engineering manager (0.5) | Summary (one page, with key results and recommendations) |
+| Objectives as bullet points (0.5) | Objectives |
+| Related theory from different sources, with the sources cited (0.5) | Related Theory; References |
+| Position analysis: data-selection equations, parameters, sample working, 16-point analysis of all five moving links (2) | Data Selection (Tables 1–3); Section 1 – Figure 1 (sample working), Figures 2–4, Tables 4–5 |
+| Velocity analysis: relative-motion equations, calculations, scaled polygon with labels and directions (5) | Section 2 – Steps 1–4, Figure 5, Tables 6–7 |
+| Acceleration analysis: relative-motion equations, calculations, scaled polygon with labels and directions (6) | Section 3 – Table 8 (normal components), Steps 1–4, Figure 6, Tables 9–10 |
+| IC method: known ICs by inspection, unknown ICs by Kennedy's circle step by step, velocities from the ICs (6) | Section 4 – Figure 7, Table 11, Figures 8 and 8b, Table 12 |
+| Analytical method: derivations for positions, velocities and accelerations of all five links (7) | Sections 5.1–5.3 (links 2–6); results and comparison in 5.4 (Tables 13–16) |
+| Computational method: positions, velocities and accelerations of all five links with software (5) | Section 7 – Figures 10–14, Tables 20–22; Working Model build sheet in 7.1 |
+| Dynamic forces: FBDs of all links, all equations, matrix set-up, solved with software (5) | Section 6 – Figure 9, Equations (1)–(14), Tables 17–19 |
+| Balancing strategy for the six-bar (2) | Section 8 – 8.3 (strategy), Table 25, 8.4 (discussion) |
+
+Table: Table 26 – Where each rubric criterion is addressed.
+
+**Other handout requirements.** The 16 positions are drawn to scale with the limits of motion and the outlined joint paths (Figure 3, Table 5). Velocities and accelerations are tabulated (Tables 6–10). The ICs and velocities are drawn on a separate diagram (Figures 8–8b). The analytical results are compared with the graphical ones (Table 16). Paths, velocities, accelerations, pin forces, slider side loads and driving torque are computed over one revolution and compared with the other methods (Section 7). Shaking force and moment are evaluated and the balancing results discussed (Section 8). The report follows the handout's section order. The "disc with computer model and results" corresponds to the `analysis/` and `output/` folders of the repository.
+
+# Appendix C – Software and reproducibility {#appendixC}
 
 All calculations, drawings and this report are generated by the Python scripts in the repository:
 
