@@ -31,14 +31,15 @@ Self-checks built into the code:
 - power balance for the driving torque;
 - third-line collinearity for every IC.
 
-## Re-running with your own parameters
+## Generating a practice set
 
-Edit the four "given" values (and AB, BE) in `analysis/params.py`, then:
+To make a fresh answer key for practice, put made-up values for the four "given" parameters (and AB, BE) in `analysis/params.py`, then:
 
 ```bash
 pip install -r requirements.txt          # numpy, scipy, matplotlib, jinja2, pypdf
 python3 analysis/run_all.py              # figures, tables, results.json
 python3 report/build_report.py           # PDF + DOCX (needs pandoc, node and playwright/chromium)
+python3 analysis/verify_independent.py   # independent recheck of every reported number
 ```
 
 `analysis/params.py` lists the data-selection rules. Pick AB and BE that satisfy both inequalities; around 3.5–3.8·OA and 2·OA works well.

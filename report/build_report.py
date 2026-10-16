@@ -113,6 +113,7 @@ def build_context(R):
     ratios = [mag(a[k]) / g for k in ("aG2", "aG3", "aG4", "aG5", "aG6")]
     ctx["gmin"], ctx["gmax"] = min(ratios), max(ratios)
     ctx["g3s"] = R["g3_sensitivity"]
+    ctx["g3max"] = max(abs(v) for k_, v in R["g3_sensitivity"].items() if k_ in ("T12", "F12", "F32", "F43", "F14", "F53"))
     # table keys must not contain '|' (it would split the markdown table)
     R["sec7"]["compare"] = {k.replace("|", "").replace(" (N)", " magnitude (N)") if k.startswith("|") else k: v
                             for k, v in R["sec7"]["compare"].items()}
@@ -169,7 +170,18 @@ def render_markdown(ctx, figext, name="template.md.j2"):
                              undefined=jinja2.StrictUndefined)
     env.globals.update(fm=fmt_matrix_cell)
     tpl = env.get_template(name)
-    return tpl.render(figext=figext, **ctx)
+    return protect_math_commas(tpl.render(figext=figext, **ctx))
+
+
+MATH_RE = re.compile(r"(\$\$.+?\$\$|\$[^$\n]+?\$)", re.S)
+
+
+def protect_math_commas(md):
+    """Inside TeX maths a bare ',' is punctuation and gets a space after it, so
+    1,812.9 would print as '1, 812.9'.  Wrap thousands separators as {,}."""
+    def fix(m):
+        return re.sub(r"(\d),(\d{3})", r"\1{,}\2", m.group(0))
+    return MATH_RE.sub(fix, md)
 
 
 def make_toc(html, pages=None):
